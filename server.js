@@ -133,7 +133,7 @@ const server = http.createServer(async (req, res) => {
     const room = rooms[roomId];
 
     if (!room) return sendJSON(res, 404, { error: 'Стол не найден!' });
-    if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра на этом столе уже началась!' });
+    if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра уже началась!' });
     if (room.players.length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол уже заполнен!' });
     if (room.players.some(p => p.uid === uid)) return sendJSON(res, 200, { ok: true, room });
     if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно 💵 для ставки!' });

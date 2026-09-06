@@ -183,7 +183,8 @@ function generateTicket() {
   const counts = new Array(9).fill(1);
   let remaining = 15 - 9;
   while (remaining > 0) { const idx = Math.floor(Math.random() * 9); if (counts[idx] < 3) { counts[idx]++; remaining--; } }
-  const rowCap = [5, 5, 5]; const colRows = [];
+  const rowCap = [5, 5, 5]; 
+  const colRows = [];
   for (let c = 0; c < 9; c++) {
     let avail = [0, 1, 2].filter(r => rowCap[r] > 0).sort(() => Math.random() - 0.5);
     const chosen = avail.slice(0, Math.min(counts[c], avail.length));
@@ -210,7 +211,10 @@ function startGame(mode, numCards) {
   document.getElementById('game-player-avatar').textContent = AVATARS[user.avatar];
   document.getElementById('game-player-name').textContent = user.name;
   const tickets = []; const marks = [];
-  for (let i = 0; i < numCards; i++) { tickets.push(generateTicket()); marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false))); }
+  for (let i = 0; i < numCards; i++) { 
+    tickets.push(generateTicket()); 
+    marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false))); 
+  }
   gameState = { mode, tickets, marks, bots: [], drawn: [], currentNumber: null, finished: false, timer: null };
   renderTickets();
   gameState.timer = setInterval(() => {
@@ -218,7 +222,7 @@ function startGame(mode, numCards) {
     let n; do { n = Math.floor(1 + Math.random() * 90); } while (gameState.drawn.includes(n));
     gameState.drawn.push(n); gameState.currentNumber = n;
     document.getElementById('drum-number').textContent = n;
-    document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `«${NICKNAMES[n]}»` : '';
+    document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `"${NICKNAMES[n]}"` : '';
     renderTickets();
     if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) {
       clearInterval(gameState.timer); alert("Вы победили!");
@@ -258,7 +262,6 @@ function ticketFullyMarked(t, m) {
   return true;
 }
 
-// --- МУЛЬТИПЛЕЕР И ЧАТЫ ---
 document.getElementById('btn-open-multiplayer').addEventListener('click', () => {
   document.getElementById('modal-multiplayer').classList.remove('hidden');
   document.getElementById('multi-create-block').classList.remove('hidden');
@@ -272,7 +275,7 @@ document.getElementById('btn-close-multiplayer').addEventListener('click', () =>
 document.getElementById('btn-multi-create').addEventListener('click', async () => {
   const maxPlayers = document.getElementById('multi-max-players').value;
   const stake = document.getElementById('multi-stake').value;
-  const res = await fetch('/api/room/create', { method: 'POST', body: JSON.stringify({ uid, maxPlayers, stake }) });
+  const res = await fetch('/api/room/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, maxPlayers, stake }) });
   const data = await res.json();
   if (data.error) return alert(data.error);
   user.bills = data.userBalance; renderMenu();
@@ -280,12 +283,13 @@ document.getElementById('btn-multi-create').addEventListener('click', async () =
 });
 document.getElementById('btn-multi-join').addEventListener('click', async () => {
   const roomId = document.getElementById('multi-room-id').value.trim();
-  const res = await fetch('/api/room/join', { method: 'POST', body: JSON.stringify({ uid, roomId }) });
+  const res = await fetch('/api/room/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, roomId }) });
   const data = await res.json();
   if (data.error) return alert(data.error);
   if (data.userBalance) { user.bills = data.userBalance; renderMenu(); }
   startWaiting(roomId);
 });
+
 function startWaiting(roomId) {
   currentRoomId = roomId;
   document.getElementById('multi-create-block').classList.add('hidden');
@@ -294,6 +298,7 @@ function startWaiting(roomId) {
   document.getElementById('txt-table-code').textContent = roomId;
   multiSyncInterval = setInterval(syncRoom, 1000);
 }
+
 async function syncRoom() {
   const res = await fetch(`/api/room/sync?roomId=${currentRoomId}`);
   if (!res.ok) return clearInterval(multiSyncInterval);
@@ -301,11 +306,22 @@ async function syncRoom() {
   document.getElementById('multi-players-list').innerHTML = room.players.map(p => `<div>🧑‍💻 ${p.name}</div>`).join('');
   if (room.status === 'playing') { clearInterval(multiSyncInterval); document.getElementById('modal-multiplayer').classList.add('hidden'); startMultiGame(room); }
 }
+
 function startMultiGame(room) {
   document.getElementById('screen-menu').classList.remove('active');
   document.getElementById('screen-game').classList.add('active');
   document.getElementById('room-chat-container').classList.remove('hidden');
-  gameState = { mode: 'A', tickets: [generateTicket(), generateTicket(), generateTicket()], marks: Array.from({length:3},()=>Array.from({length:3},()=>new Array(9).fill(false))), drawn: [], bank: room.bank };
+  gameState = {
+    mode: 'A',
+    tickets: [generateTicket(), generateTicket(), generateTicket()],
+    marks: [
+      [new Array(9).fill(false), new Array(9).fill(false), new Array(9).fill(false)],
+      [new Array(9).fill(false), new Array(9).fill(false), new Array(9).fill(false)],
+      [new Array(9).fill(false), new Array(9).fill(false), new Array(9).fill(false)]
+    ],
+    drawn: [],
+    bank: room.bank
+  };
   renderTickets();
   multiSyncInterval = setInterval(async () => {
     const res = await fetch(`/api/room/sync?roomId=${currentRoomId}`);
@@ -326,43 +342,56 @@ function startMultiGame(room) {
     if (rState.status === 'finished') { clearInterval(multiSyncInterval); alert("Игра завершена!"); location.reload(); }
   }, 1500);
 }
-// Чат стола
+
+document.getElementById('btn-open-global-chat').addEventListener('click', () => {
+  document.getElementById('modal-global-chat').classList.remove('hidden');
+  updateGlobalChat();
+});
+document.getElementById('btn-close-global-chat').addEventListener('click', () => {
+  document.getElementById('modal-global-chat').classList.add('hidden');
+});
+
 document.getElementById('btn-room-chat-send').addEventListener('click', async () => {
   const input = document.getElementById('room-chat-input');
   if(!input.value.trim()) return;
-  await fetch('/api/chat/room/send', { method: 'POST', body: JSON.stringify({ uid, roomId: currentRoomId, text: input.value.trim() }) });
+  await fetch('/api/chat/room/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, roomId: currentRoomId, text: input.value.trim() }) });
   input.value = '';
 });
-// Общий чат
+
 document.getElementById('btn-global-chat-send').addEventListener('click', async () => {
   const input = document.getElementById('global-chat-input');
   if(!input.value.trim()) return;
-  await fetch('/api/chat/global/send', { method: 'POST', body: JSON.stringify({ uid, text: input.value.trim() }) });
+  await fetch('/api/chat/global/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, text: input.value.trim() }) });
   input.value = ''; updateGlobalChat();
 });
+
 async function updateGlobalChat() {
-  if (!document.getElementById('screen-menu').classList.contains('active')) return;
+  if (document.getElementById('modal-global-chat').classList.contains('hidden')) return;
   const res = await fetch('/api/chat/global'); const messages = await res.json();
-  document.getElementById('global-chat-messages').innerHTML = messages.map(m => `<div><b>${m.name}:</b> ${m.text}</div>`).join('');
+  const chatBox = document.getElementById('global-chat-messages');
+  chatBox.innerHTML = messages.map(m => `<div><b>${m.name}:</b> ${m.text}</div>`).join('');
+  chatBox.scrollTop = chatBox.scrollHeight;
 }
 setInterval(updateGlobalChat, 2000);
-// Админка и подарки
+
 document.getElementById('btn-admin-login').addEventListener('click', () => document.getElementById('modal-admin').classList.remove('hidden'));
 document.getElementById('btn-close-admin').addEventListener('click', () => document.getElementById('modal-admin').classList.add('hidden'));
 document.getElementById('btn-admin-auth').addEventListener('click', async () => {
   currentAdminPassword = document.getElementById('admin-password-input').value;
-  const res = await fetch('/api/admin/players', { method: 'POST', body: JSON.stringify({ adminPassword: currentAdminPassword }) });
+  const res = await fetch('/api/admin/players', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword: currentAdminPassword }) });
   if(!res.ok) return alert("Пароль неверный!");
   document.getElementById('admin-auth-block').classList.add('hidden');
   document.getElementById('admin-panel-block').classList.remove('hidden');
   const players = await res.json();
-  document.getElementById('admin-players-list').innerHTML = players.map(p => `<div style="margin-bottom:8px;"><b>${p.name}</b> (${p.bills}💵)<br> <input type="number" id="b-${p.uid}" placeholder="+💵" style="width:60px;"> <button class="btn" onclick="giveGift('${p.uid}')">Подарить</button></div>`).join('');
+  document.getElementById('admin-players-list').innerHTML = players.map(p => `<div style="margin-bottom:8px;"><b>${p.name}</b> (${p.bills}💵)<br> <input type="number" id="b-${p.uid}" placeholder="+💵" style="width:60px; color:#000;"> <button class="btn" onclick="giveGift('${p.uid}')">Подарить</button></div>`).join('');
 });
+
 window.giveGift = async (targetUid) => {
   const amountBills = document.getElementById(`b-${targetUid}`).value || 0;
-  await fetch('/api/admin/give-reward', { method: 'POST', body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, amountBills, amountCoins: 0 }) });
+  await fetch('/api/admin/give-reward', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, amountBills, amountCoins: 0 }) });
   alert("Подарок отправлен!");
 };
+
 function showGiftNotifications(gifts) {
   let b = 0; gifts.forEach(g => b += g.bills);
   document.getElementById('gift-alert-bills').textContent = `+${b} 💵`;
@@ -375,4 +404,10 @@ function showGiftNotifications(gifts) {
 document.getElementById('btn-play').addEventListener('click', () => openModal('setup'));
 document.getElementById('setup-start').addEventListener('click', () => { closeModal('setup'); startGame('A', 3); });
 document.getElementById('btn-exit-game').addEventListener('click', () => location.reload());
+
+let soundOn = true;
+document.getElementById('btn-sound').addEventListener('click', (e) => {
+  soundOn = !soundOn;
+  e.target.textContent = soundOn ? '🔊' : '🔇';
+});
 loadUser();
