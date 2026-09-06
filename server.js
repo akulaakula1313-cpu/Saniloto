@@ -67,7 +67,6 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const { pathname, searchParams } = url;
 
-  // Проверка состояния и блокировки
   if (pathname === '/api/state' && req.method === 'GET') {
     const db = loadDB();
     let uid = searchParams.get('uid');
@@ -85,7 +84,6 @@ const server = http.createServer(async (req, res) => {
     const db = loadDB();
     if (!uid || !db.users[uid]) return sendJSON(res, 400, { error: 'bad_uid' });
     
-    // Если забанен, не давать обновлять профиль
     if (db.users[uid].isBanned) {
       return sendJSON(res, 200, { ok: false, user: db.users[uid], banned: true });
     }
@@ -107,7 +105,6 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, list.slice(0, 50));
   }
 
-  // Мультиплеер комнат
   if (pathname === '/api/room/create' && req.method === 'POST') {
     const { uid, maxPlayers, stake } = await readBody(req);
     const db = loadDB();
@@ -147,7 +144,7 @@ const server = http.createServer(async (req, res) => {
     if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра уже началась!' });
     if (room.players.length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол заполнен!' });
     if (room.players.some(p => p.uid === uid)) return sendJSON(res, 200, { ok: true, room });
-    if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно 💵!' });
+    if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно \uD83D\uDCB5!' });
 
     user.bills -= room.stake;
     room.bank += room.stake;
@@ -175,7 +172,6 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, room);
   }
 
-  // --- АДМИН-ПАНЕЛЬ (УПРАВЛЕНИЕ) ---
   if (pathname === '/api/admin/players' && req.method === 'POST') {
     const { adminPassword } = await readBody(req);
     if (adminPassword !== 'admin123') return sendJSON(res, 403, { error: 'Пароль неверный!' });
@@ -203,8 +199,6 @@ const server = http.createServer(async (req, res) => {
     db.users[targetUid].coins += c;
 
     if (!db.users[targetUid].pendingGifts) db.users[targetUid].pendingGifts = [];
-    
-    // Записываем подарок или личное сообщение от SANI GROUP
     db.users[targetUid].pendingGifts.push({
       from: "SANI GROUP",
       bills: b,
@@ -244,7 +238,6 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { ok: true });
   }
 
-  // Чаты
   if (pathname === '/api/chat/global' && req.method === 'GET') {
     const now = Date.now();
     globalChat = globalChat.filter(msg => (now - msg.time) < 24 * 60 * 60 * 1000);
