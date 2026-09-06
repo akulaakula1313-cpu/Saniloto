@@ -1,6 +1,3 @@
-// server.js — сервер игры "Лото Онлайн"
-// Написан на чистом Node.js (без express и без npm install) —
-// достаточно "node server.js".
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -9,39 +6,20 @@ const { URL } = require('url');
 
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'db.json');
-const DAY = 24 * 60 * 60 * 1000;
+
+const rooms = {}; 
+let globalChat = [];
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon'
+  '.json': 'application/json; charset=utf-8'
 };
 
-// ---------- простое файловое "хранилище" ----------
 function loadDB() {
   if (!fs.existsSync(DB_FILE)) {
-    const initial = {
-      users: {},
-      // стартовый лидерборд, как на скриншоте
-      leaderboard: [
-        { name: 'Татьяна Прибыткова', score: 31759400 },
-        { name: 'ЕленаФалкова', score: 28000700 },
-        { name: 'МихаилМака1785474285', score: 26615300 },
-        { name: 'Рустам Файзулин', score: 5500 },
-        { name: 'Дарья', score: 5500 },
-        { name: 'Надежда О.', score: 5500 },
-        { name: 'Kiki', score: 5500 },
-        { name: 'Дмитрий Пирогов', score: 5500 },
-        { name: 'Анастасия Шалфеева', score: 5500 },
-        { name: 'сергей п.', score: 5400 },
-        { name: 'Сергей М.', score: 5400 }
-      ]
-    };
+    const initial = { users: {}, leaderboard: [] };
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
     return initial;
   }
@@ -54,60 +32,37 @@ function saveDB(db) {
 
 function defaultUser(name) {
   return {
-    name: name || 'Sani2025 Sani Park',
+    name: name || 'Игрок_' + Math.floor(1000 + Math.random() * 9000),
     avatar: 0,
     marker: 0,
     unlockedMarkers: [0],
     bills: 5000,
-    coins: 20,
+    coins: 50,
     dailyStreak: 0,
     lastClaim: 0,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    pendingGifts: []
   };
 }
 
-// ---------- вспомогательные функции ----------
 function sendJSON(res, status, data) {
   const body = JSON.stringify(data);
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Content-Length': Buffer.byteLength(body)
-  });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(body);
 }
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
+async function readBody(req) {
+  return new Promise((resolve) => {
     let chunks = '';
-    req.on('data', c => { chunks += c; if (chunks.length > 1e6) req.destroy(); });
+    req.on('data', c => chunks += c);
     req.on('end', () => {
-      if (!chunks) return resolve({});
-      try { resolve(JSON.parse(chunks)); } catch (e) { reject(e); }
+      try { resolve(JSON.parse(chunks)); } catch { resolve({}); }
     });
-    req.on('error', reject);
   });
 }
 
-function serveStatic(req, res, pathname) {
-  let filePath = pathname === '/' ? '/index.html' : pathname;
-  filePath = path.normalize(filePath).replace(/^(\.\.[/\\])+/, '');
-  const fullPath = path.join(__dirname, filePath);
-
-  // защита от выхода за пределы папки проекта
-  if (!fullPath.startsWith(__dirname)) {
-    res.writeHead(403); res.end('Forbidden'); return;
-  }
-
-  fs.readFile(fullPath, (err, data) => {
-    if (err) { res.writeHead(404); res.end('Not found'); return; }
-    const ext = path.extname(fullPath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
-    res.end(data);
-  });
-}
-
-// ---------- API-обработчики ----------
-async function handleApi(req, res, url) {
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const { pathname, searchParams } = url;
 
   if (pathname === '/api/state' && req.method === 'GET') {
@@ -122,8 +77,7 @@ async function handleApi(req, res, url) {
   }
 
   if (pathname === '/api/state' && req.method === 'POST') {
-    const body = await readBody(req).catch(() => null);
-    if (!body) return sendJSON(res, 400, { error: 'bad_json' });
+    const body = await readBody(req);
     const { uid, ...update } = body;
     const db = loadDB();
     if (!uid || !db.users[uid]) return sendJSON(res, 400, { error: 'bad_uid' });
@@ -134,56 +88,158 @@ async function handleApi(req, res, url) {
 
   if (pathname === '/api/leaderboard' && req.method === 'GET') {
     const db = loadDB();
-    const list = [...db.leaderboard];
-    Object.values(db.users).forEach(u => list.push({ name: u.name, score: u.bills }));
+    const list = [];
+    Object.values(db.users).forEach(u => {
+      list.push({ name: u.name, score: u.bills });
+    });
     list.sort((a, b) => b.score - a.score);
     return sendJSON(res, 200, list.slice(0, 50));
   }
 
-  if (pathname === '/api/dailyreward/claim' && req.method === 'POST') {
-    const body = await readBody(req).catch(() => null);
-    if (!body) return sendJSON(res, 400, { error: 'bad_json' });
+  if (pathname === '/api/room/create' && req.method === 'POST') {
+    const { uid, maxPlayers, stake } = await readBody(req);
     const db = loadDB();
-    const user = db.users[body.uid];
-    if (!user) return sendJSON(res, 400, { error: 'bad_uid' });
+    const user = db.users[uid];
+    if (!user || user.bills < stake) return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
 
-    const now = Date.now();
-    if (now - user.lastClaim < DAY) {
-      return sendJSON(res, 400, { error: 'already_claimed' });
+    let roomId;
+    do {
+      roomId = Math.floor(1000 + Math.random() * 9000).toString();
+    } while (rooms[roomId]);
+
+    user.bills -= stake;
+    saveDB(db);
+
+    rooms[roomId] = {
+      id: roomId,
+      stake: parseInt(stake, 10),
+      maxPlayers: parseInt(maxPlayers, 10),
+      players: [{ uid, name: user.name, avatar: user.avatar, tickets: [] }],
+      status: 'waiting',
+      deck: Array.from({ length: 90 }, (_, i) => i + 1).sort(() => Math.random() - 0.5),
+      drawn: [],
+      bank: parseInt(stake, 10),
+      lastTick: Date.now(),
+      chat: []
+    };
+
+    return sendJSON(res, 200, { ok: true, roomId, room: rooms[roomId], userBalance: user.bills });
+  }
+
+  if (pathname === '/api/room/join' && req.method === 'POST') {
+    const { uid, roomId } = await readBody(req);
+    const db = loadDB();
+    const user = db.users[uid];
+    const room = rooms[roomId];
+
+    if (!room) return sendJSON(res, 404, { error: 'Стол не найден!' });
+    if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра на этом столе уже началась!' });
+    if (room.players.length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол уже заполнен!' });
+    if (room.players.some(p => p.uid === uid)) return sendJSON(res, 200, { ok: true, room });
+    if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно 💵 для ставки!' });
+
+    user.bills -= room.stake;
+    room.bank += room.stake;
+    saveDB(db);
+
+    room.players.push({ uid, name: user.name, avatar: user.avatar, tickets: [] });
+
+    if (room.players.length === room.maxPlayers) {
+      room.status = 'playing';
     }
 
-    const rewards = [
-      { bills: 500 }, { bills: 1000 }, { coins: 10 },
-      { bills: 1500 }, { coins: 30 }, { bills: 3000 }, { coins: 45 }
-    ];
-    const dayIndex = user.dailyStreak % 7;
-    const reward = rewards[dayIndex];
+    return sendJSON(res, 200, { ok: true, room, userBalance: user.bills });
+  }
 
-    user.bills += reward.bills || 0;
-    user.coins += reward.coins || 0;
-    user.dailyStreak += 1;
-    user.lastClaim = now;
+  if (pathname === '/api/room/sync' && req.method === 'GET') {
+    const roomId = searchParams.get('roomId');
+    const room = rooms[roomId];
+    if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
 
+    if (room.status === 'playing' && Date.now() - room.lastTick >= 4000) {
+      if (room.deck.length > 0) {
+        room.drawn.push(room.deck.pop());
+        room.lastTick = Date.now();
+      } else {
+        room.status = 'finished';
+      }
+    }
+    return sendJSON(res, 200, room);
+  }
+
+  if (pathname === '/api/admin/players' && req.method === 'POST') {
+    const { adminPassword } = await readBody(req);
+    if (adminPassword !== 'admin123') {
+      return sendJSON(res, 403, { error: 'Неверный пароль администратора!' });
+    }
+    const db = loadDB();
+    const playersList = Object.keys(db.users).map(id => ({
+      uid: id,
+      name: db.users[id].name,
+      bills: db.users[id].bills,
+      coins: db.users[id].coins
+    }));
+    return sendJSON(res, 200, playersList);
+  }
+
+  if (pathname === '/api/admin/give-reward' && req.method === 'POST') {
+    const { adminPassword, targetUid, amountBills, amountCoins } = await readBody(req);
+    if (adminPassword !== 'admin123') {
+      return sendJSON(res, 403, { error: 'Неверный пароль администратора!' });
+    }
+    const db = loadDB();
+    if (!db.users[targetUid]) return sendJSON(res, 404, { error: 'Игрок не найден!' });
+
+    const bills = parseInt(amountBills || 0, 10);
+    const coins = parseInt(amountCoins || 0, 10);
+
+    db.users[targetUid].bills += bills;
+    db.users[targetUid].coins += coins;
+    
+    if (!db.users[targetUid].pendingGifts) db.users[targetUid].pendingGifts = [];
+    db.users[targetUid].pendingGifts.push({ from: "SANI GROUP", bills, coins, time: Date.now() });
+    
     saveDB(db);
-    return sendJSON(res, 200, { ok: true, reward, dayIndex, user });
+    return sendJSON(res, 200, { ok: true, user: db.users[targetUid] });
   }
 
-  sendJSON(res, 404, { error: 'not_found' });
-}
-
-// ---------- главный обработчик ----------
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  if (url.pathname.startsWith('/api/')) {
-    handleApi(req, res, url).catch(err => {
-      console.error(err);
-      sendJSON(res, 500, { error: 'server_error' });
-    });
-  } else {
-    serveStatic(req, res, url.pathname);
+  if (pathname === '/api/chat/global' && req.method === 'GET') {
+    const now = Date.now();
+    globalChat = globalChat.filter(msg => (now - msg.time) < 24 * 60 * 60 * 1000);
+    return sendJSON(res, 200, globalChat);
   }
+
+  if (pathname === '/api/chat/global/send' && req.method === 'POST') {
+    const { uid, text } = await readBody(req);
+    const db = loadDB();
+    const user = db.users[uid];
+    if (!user || !text || text.trim() === '') return sendJSON(res, 400, { error: 'Ошибка отправки' });
+
+    globalChat.push({ name: user.name, text: text.trim().substring(0, 150), time: Date.now() });
+    return sendJSON(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/chat/room/send' && req.method === 'POST') {
+    const { uid, roomId, text } = await readBody(req);
+    const db = loadDB();
+    const user = db.users[uid];
+    const room = rooms[roomId];
+
+    if (!room || !user || !text || text.trim() === '') return sendJSON(res, 400, { error: 'Ошибка' });
+    if (!room.chat) room.chat = [];
+
+    room.chat.push({ name: user.name, text: text.trim().substring(0, 150), time: Date.now() });
+    return sendJSON(res, 200, { ok: true });
+  }
+
+  let filePath = pathname === '/' ? '/index.html' : pathname;
+  const fullPath = path.join(__dirname, filePath);
+  fs.readFile(fullPath, (err, data) => {
+    if (err) { res.writeHead(404); res.end('Not Found'); return; }
+    const ext = path.extname(fullPath).toLowerCase();
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.end(data);
+  });
 });
 
-server.listen(PORT, () => {
-  console.log(`Лото сервер запущен: http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Лото Сервер работает на http://localhost:${PORT}`));

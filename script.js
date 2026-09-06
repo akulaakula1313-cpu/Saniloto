@@ -1,6 +1,3 @@
-// script.js — логика игры "Лото Онлайн"
-
-// ---------- константы ----------
 const AVATARS = ['🧑‍🦲', '👩‍🦰', '👩', '🧕', '👩🏻‍🦳', '👨🏽', '🧑‍🦱', '👱', '🧔', '🧑‍🦰'];
 const MARKERS = [
   { id: 0, color: '#8e44ad', cost: 0 },
@@ -9,35 +6,26 @@ const MARKERS = [
   { id: 3, color: '#27ae60', cost: 15000 }
 ];
 const DAILY_REWARDS = [
-  { icon: '💵', text: '500' },
-  { icon: '💵', text: '1000' },
-  { icon: '🪙', text: '10' },
-  { icon: '💵', text: '1500' },
-  { icon: '🪙', text: '30' },
-  { icon: '💵', text: '3000' },
-  { icon: '🪙', text: '45' }
+  { icon: '💵', text: '500' }, { icon: '💵', text: '1000' }, { icon: '🪙', text: '10' },
+  { icon: '💵', text: '1500' }, { icon: '🪙', text: '30' }, { icon: '💵', text: '3000' }, { icon: '🪙', text: '45' }
 ];
 const SHOP_ITEMS = [
-  { bills: 500, coins: 10 },
-  { bills: 1000, coins: 15 },
-  { bills: 2000, coins: 29 },
-  { bills: 4000, coins: 49 },
-  { bills: 10000, coins: 79 }
+  { bills: 500, coins: 10 }, { bills: 1000, coins: 15 }, { bills: 2000, coins: 29 }, { bills: 4000, coins: 49 }, { bills: 10000, coins: 79 }
 ];
 const DRAW_INTERVAL = 4000;
-const BOT_NAMES = ['NEON', 'Anti_Petuh'];
-const STAKE = 300; // ставка за игрока в режиме "Три на три"
+const STAKE = 300;
 
-// традиционные прозвища бочонков
 const NICKNAMES = {
-  1: 'Кол', 3: 'Троечка', 11: 'Барабанные палочки', 12: 'Дюжина',
-  13: 'Чёртова дюжина', 22: 'Гуси-лебеди', 25: 'Четвертак', 44: 'Стульчики',
-  50: 'Полтинник', 66: 'Валенки', 77: 'Топорики', 89: 'Дедушкин сосед', 90: 'Дедушка'
+  1: 'Кол', 3: 'Троечка', 11: 'Барабанные палочки', 12: 'Дюжина', 13: 'Чёртова дюжина',
+  22: 'Гуси-лебеди', 25: 'Четвертак', 44: 'Стульчики', 50: 'Полтинник', 66: 'Валенки',
+  77: 'Топорики', 89: 'Дедушкин сосед', 90: 'Дедушка'
 };
 
-// ---------- состояние игрока ----------
 let uid = localStorage.getItem('loto_uid');
 let user = null;
+let currentRoomId = null;
+let multiSyncInterval = null;
+let currentAdminPassword = "";
 
 async function loadUser() {
   const res = await fetch(`/api/state?uid=${uid || ''}`);
@@ -46,6 +34,7 @@ async function loadUser() {
   localStorage.setItem('loto_uid', uid);
   user = data;
   renderMenu();
+  if (user.pendingGifts && user.pendingGifts.length > 0) showGiftNotifications(user.pendingGifts);
 }
 
 function saveUser(patch) {
@@ -59,7 +48,6 @@ function saveUser(patch) {
   if (document.getElementById('screen-game').classList.contains('active')) renderGameCurrency();
 }
 
-// ---------- рендер меню ----------
 function renderMenu() {
   if (!user) return;
   document.getElementById('menu-avatar-emoji').textContent = AVATARS[user.avatar] || AVATARS[0];
@@ -73,7 +61,6 @@ function renderGameCurrency() {
   document.getElementById('game-cur-coins').textContent = user.coins;
 }
 
-// ---------- модалки ----------
 function openModal(name) {
   document.getElementById('modal-' + name).classList.remove('hidden');
   if (name === 'daily') renderDaily();
@@ -86,16 +73,12 @@ function closeModal(name) {
   document.getElementById('modal-' + name).classList.add('hidden');
 }
 
-document.querySelectorAll('[data-modal]').forEach(btn => {
-  btn.addEventListener('click', () => openModal(btn.dataset.modal));
-});
-document.querySelectorAll('[data-close]').forEach(btn => {
-  btn.addEventListener('click', () => closeModal(btn.dataset.close));
-});
+document.querySelectorAll('[data-modal]').forEach(btn => btn.addEventListener('click', () => openModal(btn.dataset.modal)));
+document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
 
-// ---------- ежедневные награды ----------
 function renderDaily() {
   const grid = document.getElementById('daily-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   const today = user.dailyStreak % 7;
   const now = Date.now();
@@ -109,10 +92,7 @@ function renderDaily() {
     cell.innerHTML = `<div class="d-num">${i + 1}</div><div class="d-icon">${r.icon}</div><div>${r.text}</div>`;
     grid.appendChild(cell);
   });
-
-  const claimBtn = document.getElementById('daily-claim');
-  claimBtn.disabled = !canClaim;
-  claimBtn.textContent = canClaim ? 'Получить' : 'Уже получено сегодня';
+  document.getElementById('daily-claim').disabled = !canClaim;
 }
 
 document.getElementById('daily-claim').addEventListener('click', async () => {
@@ -122,16 +102,12 @@ document.getElementById('daily-claim').addEventListener('click', async () => {
     body: JSON.stringify({ uid })
   });
   const data = await res.json();
-  if (data.ok) {
-    user = { ...user, ...data.user };
-    renderMenu();
-    renderDaily();
-  }
+  if (data.ok) { user = { ...user, ...data.user }; renderMenu(); renderDaily(); }
 });
 
-// ---------- лидерборд ----------
 async function renderLeaderboard() {
   const list = document.getElementById('leaderboard-list');
+  if (!list) return;
   list.innerHTML = 'Загрузка...';
   const res = await fetch('/api/leaderboard');
   const data = await res.json();
@@ -139,15 +115,14 @@ async function renderLeaderboard() {
   data.forEach((row, i) => {
     const div = document.createElement('div');
     div.className = 'lb-row' + (row.name === user.name ? ' me' : '');
-    div.innerHTML = `<div class="lb-rank">${i + 1}</div><div class="lb-emoji">🙂</div>
-      <div class="lb-name">${row.name}</div><div class="lb-score">${row.score}</div>`;
+    div.innerHTML = `<div class="lb-rank">${i + 1}</div><div class="lb-emoji">🙂</div><div class="lb-name">${row.name}</div><div class="lb-score">${row.score}</div>`;
     list.appendChild(div);
   });
 }
 
-// ---------- магазин ----------
 function renderShop() {
   const list = document.getElementById('shop-list');
+  if (!list) return;
   list.innerHTML = '';
   SHOP_ITEMS.forEach(item => {
     const row = document.createElement('div');
@@ -162,226 +137,113 @@ function renderShop() {
   });
 }
 
-document.getElementById('shop-ad').addEventListener('click', (e) => {
-  e.target.disabled = true;
-  e.target.textContent = 'Показ рекламы...';
-  setTimeout(() => {
-    saveUser({ bills: user.bills + 200 });
-    e.target.disabled = false;
-    e.target.textContent = 'Получить 200 💵 (реклама)';
-  }, 1500);
-});
-
-// ---------- маркеры ----------
 function renderMarkers() {
   const grid = document.getElementById('marker-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   MARKERS.forEach(m => {
     const owned = user.unlockedMarkers.includes(m.id);
     const cell = document.createElement('div');
     cell.className = 'marker-cell' + (user.marker === m.id ? ' selected' : '') + (!owned ? ' locked' : '');
-    cell.innerHTML = `<div class="m-dot" style="background:${m.color}"></div>
-      <div class="m-cost">${owned ? (user.marker === m.id ? 'Выбран' : 'Выбрать') : m.cost + ' 💵 🔒'}</div>`;
+    cell.innerHTML = `<div class="m-dot" style="background:${m.color}"></div><div class="m-cost">${owned ? (user.marker === m.id ? 'Выбран' : 'Выбрать') : m.cost + ' 💵 🔒'}</div>`;
     cell.addEventListener('click', () => {
-      if (owned) {
-        saveUser({ marker: m.id });
-      } else if (user.bills >= m.cost) {
-        saveUser({ bills: user.bills - m.cost, unlockedMarkers: [...user.unlockedMarkers, m.id], marker: m.id });
-      } else {
-        alert('Недостаточно 💵 для покупки');
-      }
+      if (owned) saveUser({ marker: m.id });
+      else if (user.bills >= m.cost) saveUser({ bills: user.bills - m.cost, unlockedMarkers: [...user.unlockedMarkers, m.id], marker: m.id });
       renderMarkers();
     });
     grid.appendChild(cell);
   });
 }
 
-// ---------- профиль ----------
 function renderProfile() {
-  document.getElementById('profile-current-name').textContent = user.name;
+  const input = document.getElementById('profile-name-input');
+  input.value = user.name;
   document.getElementById('profile-current-avatar').textContent = AVATARS[user.avatar];
   const grid = document.getElementById('avatar-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   let picked = user.avatar;
   AVATARS.forEach((emoji, i) => {
     const cell = document.createElement('div');
     cell.className = 'avatar-cell' + (i === picked ? ' selected' : '');
     cell.textContent = emoji;
-    cell.addEventListener('click', () => {
-      picked = i;
-      document.getElementById('profile-current-avatar').textContent = emoji;
-      grid.querySelectorAll('.avatar-cell').forEach(c => c.classList.remove('selected'));
-      cell.classList.add('selected');
-    });
+    cell.addEventListener('click', () => { picked = i; document.getElementById('profile-current-avatar').textContent = emoji; });
     grid.appendChild(cell);
   });
   document.getElementById('profile-save').onclick = () => {
-    saveUser({ avatar: picked });
+    if (!input.value.trim()) return alert('Ник не пустой!');
+    saveUser({ name: input.value.trim(), avatar: picked });
     closeModal('profile');
   };
 }
 
-// ================= ИГРА =================
-
 function generateTicket() {
   const ranges = [];
-  for (let c = 0; c < 9; c++) {
-    ranges.push({ start: c === 0 ? 1 : c * 10, end: c === 8 ? 90 : c * 10 + 9 });
-  }
-
+  for (let c = 0; c < 9; c++) ranges.push({ start: c === 0 ? 1 : c * 10, end: c === 8 ? 90 : c * 10 + 9 });
   const counts = new Array(9).fill(1);
   let remaining = 15 - 9;
-  while (remaining > 0) {
-    const idx = Math.floor(Math.random() * 9);
-    if (counts[idx] < 3) { counts[idx]++; remaining--; }
-  }
-
-  const rowCap = [5, 5, 5];
-  const colRows = [];
+  while (remaining > 0) { const idx = Math.floor(Math.random() * 9); if (counts[idx] < 3) { counts[idx]++; remaining--; } }
+  const rowCap = [5, 5, 5]; const colRows = [];
   for (let c = 0; c < 9; c++) {
-    let avail = [0, 1, 2].filter(r => rowCap[r] > 0);
-    avail.sort(() => Math.random() - 0.5);
-    avail.sort((a, b) => rowCap[b] - rowCap[a]);
+    let avail = [0, 1, 2].filter(r => rowCap[r] > 0).sort(() => Math.random() - 0.5);
     const chosen = avail.slice(0, Math.min(counts[c], avail.length));
-    chosen.forEach(r => rowCap[r]--);
-    colRows.push(chosen);
+    chosen.forEach(r => rowCap[r]--); colRows.push(chosen);
   }
-
-  const total = colRows.reduce((s, a) => s + a.length, 0);
-  if (total !== 15) return generateTicket(); // повторить, если не сошлось
-
-  const grid = [
-    new Array(9).fill(null),
-    new Array(9).fill(null),
-    new Array(9).fill(null)
-  ];
+  if (colRows.reduce((s, a) => s + a.length, 0) !== 15) return generateTicket();
+  const grid = [new Array(9).fill(null), new Array(9).fill(null), new Array(9).fill(null)];
   for (let c = 0; c < 9; c++) {
-    const pool = [];
-    for (let n = ranges[c].start; n <= ranges[c].end; n++) pool.push(n);
-    pool.sort(() => Math.random() - 0.5);
-    const nums = pool.slice(0, counts[c]).sort((a, b) => a - b);
+    const pool = []; for (let n = ranges[c].start; n <= ranges[c].end; n++) pool.push(n);
+    const nums = pool.sort(() => Math.random() - 0.5).slice(0, counts[c]).sort((a, b) => a - b);
     colRows[c].sort((a, b) => a - b).forEach((r, i) => { grid[r][c] = nums[i]; });
   }
   return grid;
 }
 
-let gameState = null; // { mode, tickets, marks, bots, deck, drawn, timer, currentNumber, finished, bank, stages }
-
-function logEvent(text) {
-  document.getElementById('event-log').textContent = text;
-}
+let gameState = null;
+function logEvent(text) { document.getElementById('event-log').textContent = text; }
 
 function startGame(mode, numCards) {
   document.getElementById('screen-menu').classList.remove('active');
   document.getElementById('screen-game').classList.add('active');
+  document.getElementById('room-chat-container').classList.add('hidden');
   renderGameCurrency();
   document.getElementById('game-player-avatar').textContent = AVATARS[user.avatar];
   document.getElementById('game-player-name').textContent = user.name;
-  document.getElementById('drum-nickname').textContent = '';
-  logEvent('');
-
-  const deck = [];
-  for (let n = 1; n <= 90; n++) deck.push(n);
-  deck.sort(() => Math.random() - 0.5);
-
-  const tickets = [];
-  const marks = [];
-  for (let i = 0; i < numCards; i++) {
-    tickets.push(generateTicket());
-    marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false)));
-  }
-
-  const bots = BOT_NAMES.map(name => ({
-    name,
-    emoji: AVATARS[Math.floor(Math.random() * AVATARS.length)],
-    ticket: generateTicket(),
-    marks: Array.from({ length: 3 }, () => new Array(9).fill(false))
-  }));
-
-  const participants = 1 + bots.length;
-  let bank = STAKE * participants;
-  if (mode === 'C') {
-    const paid = Math.min(STAKE, user.bills);
-    saveUser({ bills: user.bills - paid });
-  }
-
-  gameState = {
-    mode,
-    tickets,
-    marks,
-    bots,
-    deck,
-    drawn: [],
-    currentNumber: null,
-    finished: false,
-    timer: null,
-    bank,
-    stages: { top: { done: false }, middle: { done: false }, bottom: { done: false } }
-  };
-
-  document.getElementById('bank-box').classList.toggle('hidden', mode !== 'C');
-  renderBank();
-  renderBots();
+  const tickets = []; const marks = [];
+  for (let i = 0; i < numCards; i++) { tickets.push(generateTicket()); marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false))); }
+  gameState = { mode, tickets, marks, bots: [], drawn: [], currentNumber: null, finished: false, timer: null };
   renderTickets();
-  renderHistory();
-  document.getElementById('drum-number').textContent = '-';
-
-  gameState.timer = setInterval(() => drawNext(), DRAW_INTERVAL);
-}
-
-function renderBank() {
-  if (!gameState) return;
-  document.getElementById('bank-amount').textContent = gameState.bank;
-}
-
-function renderBots() {
-  const row = document.getElementById('bots-row');
-  row.innerHTML = '';
-  gameState.bots.forEach(bot => {
-    const marked = bot.marks.reduce((s, r) => s + r.filter(Boolean).length, 0);
-    const box = document.createElement('div');
-    box.className = 'bot-box';
-    box.innerHTML = `<div class="avatar-emoji">${bot.emoji}</div><div>${bot.name}</div>
-      <div class="bot-progress">${marked}/15</div>`;
-    row.appendChild(box);
-  });
-}
-
-function renderHistory() {
-  const row = document.getElementById('history-row');
-  row.innerHTML = '';
-  gameState.drawn.slice(-15).forEach(n => {
-    const span = document.createElement('span');
-    span.textContent = n;
-    row.appendChild(span);
-  });
+  gameState.timer = setInterval(() => {
+    if (gameState.drawn.length >= 90) return clearInterval(gameState.timer);
+    let n; do { n = Math.floor(1 + Math.random() * 90); } while (gameState.drawn.includes(n));
+    gameState.drawn.push(n); gameState.currentNumber = n;
+    document.getElementById('drum-number').textContent = n;
+    document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `«${NICKNAMES[n]}»` : '';
+    renderTickets();
+    if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) {
+      clearInterval(gameState.timer); alert("Вы победили!");
+    }
+  }, DRAW_INTERVAL);
 }
 
 function renderTickets() {
-  const container = document.getElementById('tickets-container');
-  container.innerHTML = '';
+  const container = document.getElementById('tickets-container'); container.innerHTML = '';
   const markerColor = MARKERS.find(m => m.id === user.marker).color;
-
   gameState.tickets.forEach((ticket, ti) => {
-    const table = document.createElement('table');
-    table.className = 'ticket';
+    const table = document.createElement('table'); table.className = 'ticket';
     ticket.forEach((row, ri) => {
       const tr = document.createElement('tr');
       row.forEach((val, ci) => {
         const td = document.createElement('td');
-        if (val === null) {
-          td.className = 'empty';
-        } else {
+        if (val === null) td.className = 'empty';
+        else {
           td.textContent = val;
-          const isMarked = gameState.marks[ti][ri][ci];
-          const isDrawn = gameState.drawn.includes(val);
-          if (isMarked) {
-            td.classList.add('marked');
-            td.style.background = markerColor;
-          } else if (isDrawn) {
-            td.classList.add('drawn-not-marked');
-          }
-          td.addEventListener('click', () => markCell(ti, ri, ci, val));
+          if (gameState.marks[ti][ri][ci]) { td.classList.add('marked'); td.style.background = markerColor; }
+          else if (gameState.drawn.includes(val)) td.classList.add('drawn-not-marked');
+          td.addEventListener('click', () => {
+            if (!gameState.drawn.includes(val) || gameState.marks[ti][ri][ci]) return;
+            gameState.marks[ti][ri][ci] = true; renderTickets();
+          });
         }
         tr.appendChild(td);
       });
@@ -391,221 +253,126 @@ function renderTickets() {
   });
 }
 
-// ---------- проверка заполненности ----------
-function rowFullyMarked(ticket, marksTicket, ri) {
-  for (let ci = 0; ci < 9; ci++) {
-    if (ticket[ri][ci] !== null && !marksTicket[ri][ci]) return false;
-  }
+function ticketFullyMarked(t, m) {
+  for(let r=0; r<3; r++) { for(let c=0; c<9; c++) { if (t[r][c] !== null && !m[r][c]) return false; } }
   return true;
 }
-function ticketFullyMarked(ticket, marksTicket) {
-  return [0, 1, 2].every(ri => rowFullyMarked(ticket, marksTicket, ri));
-}
 
-function markCell(ti, ri, ci, val) {
-  if (gameState.finished) return;
-  if (!gameState.drawn.includes(val)) return; // число ещё не выпало
-  if (gameState.marks[ti][ri][ci]) return;
-  gameState.marks[ti][ri][ci] = true;
-  renderTickets();
-  checkWin();
-}
-
-// боты постепенно отмечают уже выпавшие числа (не мгновенно, с шансом на ход)
-function botTick(bot) {
-  bot.ticket.forEach((row, ri) => row.forEach((val, ci) => {
-    if (val !== null && gameState.drawn.includes(val) && !bot.marks[ri][ci]) {
-      if (Math.random() < 0.6) bot.marks[ri][ci] = true;
-    }
-  }));
-}
-
-function checkWin() {
-  if (!gameState || gameState.finished) return;
-
-  if (gameState.mode === 'A') {
-    if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) { endGame('player'); return; }
-    const bot = gameState.bots.find(b => ticketFullyMarked(b.ticket, b.marks));
-    if (bot) { endGame('bot', bot); return; }
-
-  } else if (gameState.mode === 'B') {
-    if (gameState.tickets.some((t, ti) => [0, 1, 2].some(ri => rowFullyMarked(t, gameState.marks[ti], ri)))) { endGame('player'); return; }
-    const bot = gameState.bots.find(b => [0, 1, 2].some(ri => rowFullyMarked(b.ticket, b.marks, ri)));
-    if (bot) { endGame('bot', bot); return; }
-
-  } else if (gameState.mode === 'C') {
-    checkThreeOnThree();
-  }
-}
-
-// ---------- режим "Три на три" ----------
-function checkThreeOnThree() {
-  const order = [{ key: 'top', ri: 0, label: 'верхнюю' }, { key: 'middle', ri: 1, label: 'среднюю' }, { key: 'bottom', ri: 2, label: 'нижнюю' }];
-  for (const stage of order) {
-    if (gameState.stages[stage.key].done) continue;
-
-    let who = null;
-    if (gameState.tickets.some((t, ti) => rowFullyMarked(t, gameState.marks[ti], stage.ri))) who = 'player';
-    if (!who) {
-      const bot = gameState.bots.find(b => rowFullyMarked(b.ticket, b.marks, stage.ri));
-      if (bot) who = bot;
-    }
-    if (!who) continue;
-
-    gameState.stages[stage.key].done = true;
-    gameState.stages[stage.key].who = who;
-    const whoName = who === 'player' ? user.name : who.name;
-
-    if (stage.key === 'top') {
-      const add = STAKE * (gameState.bots.length + 1 - 1); // ставки остальных удваиваются
-      gameState.bank += add;
-      logEvent(`${whoName} закрыл(а) верхнюю строку — банк вырос до ${gameState.bank} 💵 (${whoName} ничего не получает)`);
-    } else if (stage.key === 'middle') {
-      const half = Math.floor(gameState.bank / 2);
-      gameState.bank -= half;
-      if (who === 'player') saveUser({ bills: user.bills + half });
-      logEvent(`${whoName} закрыл(а) среднюю строку и забрал(а) половину банка: ${half} 💵`);
-    } else if (stage.key === 'bottom') {
-      const rest = gameState.bank;
-      gameState.bank = 0;
-      if (who === 'player') saveUser({ bills: user.bills + rest });
-      renderBank();
-      endGame('three', { who, amount: rest });
-      return;
-    }
-    renderBank();
-  }
-}
-
-function drawNext() {
-  if (gameState.finished) return;
-  if (gameState.deck.length === 0) { endGame('nobody'); return; }
-
-  const num = gameState.deck.pop();
-  gameState.currentNumber = num;
-  gameState.drawn.push(num);
-  document.getElementById('drum-number').textContent = num;
-  document.getElementById('drum-nickname').textContent = NICKNAMES[num] ? `«${NICKNAMES[num]}»` : '';
-  renderHistory();
-
-  gameState.bots.forEach(botTick);
-  renderBots();
-  renderTickets();
-  checkWin();
-}
-
-function endGame(result, payload) {
-  if (gameState.finished) return;
-  gameState.finished = true;
-  clearInterval(gameState.timer);
-
-  const title = document.getElementById('result-title');
-  const text = document.getElementById('result-text');
-
-  if (result === 'player') {
-    const reward = 1000 + Math.floor(Math.random() * 4000);
-    const coinReward = 5 + Math.floor(Math.random() * 10);
-    saveUser({ bills: user.bills + reward, coins: user.coins + coinReward });
-    title.textContent = '🎉 Победа!';
-    text.textContent = `Вы первым закрыли карточку! Награда: ${reward} 💵 и ${coinReward} 🪙`;
-  } else if (result === 'bot') {
-    title.textContent = '😢 Поражение';
-    text.textContent = `${payload.name} первым закрыл карточку. Попробуйте ещё раз!`;
-  } else if (result === 'three') {
-    const { who, amount } = payload;
-    if (who === 'player') {
-      title.textContent = '🎉 Банк ваш!';
-      text.textContent = `Вы закрыли нижнюю строку первым и забрали весь банк: ${amount} 💵`;
-    } else {
-      title.textContent = '😢 Поражение';
-      text.textContent = `${who.name} закрыл(а) нижнюю строку первым(ой) и забрал(а) банк (${amount} 💵).`;
-    }
-  } else {
-    title.textContent = 'Ничья';
-    text.textContent = 'Все числа разыграны, победитель не определён.';
-  }
-
-  document.getElementById('modal-result').classList.remove('hidden');
-}
-
-document.getElementById('result-close').addEventListener('click', () => {
-  document.getElementById('modal-result').classList.add('hidden');
-  document.getElementById('screen-game').classList.remove('active');
-  document.getElementById('screen-menu').classList.add('active');
-  renderMenu();
+// --- МУЛЬТИПЛЕЕР И ЧАТЫ ---
+document.getElementById('btn-open-multiplayer').addEventListener('click', () => {
+  document.getElementById('modal-multiplayer').classList.remove('hidden');
+  document.getElementById('multi-create-block').classList.remove('hidden');
+  document.getElementById('multi-join-block').classList.remove('hidden');
+  document.getElementById('multi-waiting-block').classList.add('hidden');
 });
-
-document.getElementById('btn-exit-game').addEventListener('click', () => {
-  if (gameState && gameState.timer) clearInterval(gameState.timer);
-  document.getElementById('screen-game').classList.remove('active');
-  document.getElementById('screen-menu').classList.add('active');
+document.getElementById('btn-close-multiplayer').addEventListener('click', () => {
+  document.getElementById('modal-multiplayer').classList.add('hidden');
+  if (multiSyncInterval) clearInterval(multiSyncInterval);
 });
-
+document.getElementById('btn-multi-create').addEventListener('click', async () => {
+  const maxPlayers = document.getElementById('multi-max-players').value;
+  const stake = document.getElementById('multi-stake').value;
+  const res = await fetch('/api/room/create', { method: 'POST', body: JSON.stringify({ uid, maxPlayers, stake }) });
+  const data = await res.json();
+  if (data.error) return alert(data.error);
+  user.bills = data.userBalance; renderMenu();
+  startWaiting(data.roomId);
+});
+document.getElementById('btn-multi-join').addEventListener('click', async () => {
+  const roomId = document.getElementById('multi-room-id').value.trim();
+  const res = await fetch('/api/room/join', { method: 'POST', body: JSON.stringify({ uid, roomId }) });
+  const data = await res.json();
+  if (data.error) return alert(data.error);
+  if (data.userBalance) { user.bills = data.userBalance; renderMenu(); }
+  startWaiting(roomId);
+});
+function startWaiting(roomId) {
+  currentRoomId = roomId;
+  document.getElementById('multi-create-block').classList.add('hidden');
+  document.getElementById('multi-join-block').classList.add('hidden');
+  document.getElementById('multi-waiting-block').classList.remove('hidden');
+  document.getElementById('txt-table-code').textContent = roomId;
+  multiSyncInterval = setInterval(syncRoom, 1000);
+}
+async function syncRoom() {
+  const res = await fetch(`/api/room/sync?roomId=${currentRoomId}`);
+  if (!res.ok) return clearInterval(multiSyncInterval);
+  const room = await res.json();
+  document.getElementById('multi-players-list').innerHTML = room.players.map(p => `<div>🧑‍💻 ${p.name}</div>`).join('');
+  if (room.status === 'playing') { clearInterval(multiSyncInterval); document.getElementById('modal-multiplayer').classList.add('hidden'); startMultiGame(room); }
+}
+function startMultiGame(room) {
+  document.getElementById('screen-menu').classList.remove('active');
+  document.getElementById('screen-game').classList.add('active');
+  document.getElementById('room-chat-container').classList.remove('hidden');
+  gameState = { mode: 'A', tickets: [generateTicket(), generateTicket(), generateTicket()], marks: Array.from({length:3},()=>Array.from({length:3},()=>new Array(9).fill(false))), drawn: [], bank: room.bank };
+  renderTickets();
+  multiSyncInterval = setInterval(async () => {
+    const res = await fetch(`/api/room/sync?roomId=${currentRoomId}`);
+    const rState = await res.json();
+    if (rState.drawn.length !== gameState.drawn.length) {
+      gameState.drawn = rState.drawn;
+      let last = gameState.drawn[gameState.drawn.length-1];
+      document.getElementById('drum-number').textContent = last;
+      renderTickets();
+    }
+    if (rState.chat) {
+      document.getElementById('room-chat-messages').innerHTML = rState.chat.map(m=>`<div><b>${m.name}:</b> ${m.text}</div>`).join('');
+    }
+    if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) {
+      clearInterval(multiSyncInterval); saveUser({ bills: user.bills + gameState.bank });
+      alert("🎉 Вы выиграли стол и забрали банк!"); location.reload();
+    }
+    if (rState.status === 'finished') { clearInterval(multiSyncInterval); alert("Игра завершена!"); location.reload(); }
+  }, 1500);
+}
+// Чат стола
+document.getElementById('btn-room-chat-send').addEventListener('click', async () => {
+  const input = document.getElementById('room-chat-input');
+  if(!input.value.trim()) return;
+  await fetch('/api/chat/room/send', { method: 'POST', body: JSON.stringify({ uid, roomId: currentRoomId, text: input.value.trim() }) });
+  input.value = '';
+});
+// Общий чат
+document.getElementById('btn-global-chat-send').addEventListener('click', async () => {
+  const input = document.getElementById('global-chat-input');
+  if(!input.value.trim()) return;
+  await fetch('/api/chat/global/send', { method: 'POST', body: JSON.stringify({ uid, text: input.value.trim() }) });
+  input.value = ''; updateGlobalChat();
+});
+async function updateGlobalChat() {
+  if (!document.getElementById('screen-menu').classList.contains('active')) return;
+  const res = await fetch('/api/chat/global'); const messages = await res.json();
+  document.getElementById('global-chat-messages').innerHTML = messages.map(m => `<div><b>${m.name}:</b> ${m.text}</div>`).join('');
+}
+setInterval(updateGlobalChat, 2000);
+// Админка и подарки
+document.getElementById('btn-admin-login').addEventListener('click', () => document.getElementById('modal-admin').classList.remove('hidden'));
+document.getElementById('btn-close-admin').addEventListener('click', () => document.getElementById('modal-admin').classList.add('hidden'));
+document.getElementById('btn-admin-auth').addEventListener('click', async () => {
+  currentAdminPassword = document.getElementById('admin-password-input').value;
+  const res = await fetch('/api/admin/players', { method: 'POST', body: JSON.stringify({ adminPassword: currentAdminPassword }) });
+  if(!res.ok) return alert("Пароль неверный!");
+  document.getElementById('admin-auth-block').classList.add('hidden');
+  document.getElementById('admin-panel-block').classList.remove('hidden');
+  const players = await res.json();
+  document.getElementById('admin-players-list').innerHTML = players.map(p => `<div style="margin-bottom:8px;"><b>${p.name}</b> (${p.bills}💵)<br> <input type="number" id="b-${p.uid}" placeholder="+💵" style="width:60px;"> <button class="btn" onclick="giveGift('${p.uid}')">Подарить</button></div>`).join('');
+});
+window.giveGift = async (targetUid) => {
+  const amountBills = document.getElementById(`b-${targetUid}`).value || 0;
+  await fetch('/api/admin/give-reward', { method: 'POST', body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, amountBills, amountCoins: 0 }) });
+  alert("Подарок отправлен!");
+};
+function showGiftNotifications(gifts) {
+  let b = 0; gifts.forEach(g => b += g.bills);
+  document.getElementById('gift-alert-bills').textContent = `+${b} 💵`;
+  document.getElementById('modal-gift-alert').classList.remove('hidden');
+  document.getElementById('btn-close-gift-alert').onclick = () => {
+    document.getElementById('modal-gift-alert').classList.add('hidden');
+    saveUser({ pendingGifts: [] });
+  };
+}
 document.getElementById('btn-play').addEventListener('click', () => openModal('setup'));
-
-document.getElementById('setup-start').addEventListener('click', () => {
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  const cards = parseInt(document.querySelector('input[name="cards"]:checked').value, 10);
-  closeModal('setup');
-  startGame(mode, cards);
-});
-
-// ---------- усиления ----------
-function spend(cost, currency) {
-  if (user[currency] < cost) { alert('Недостаточно ' + (currency === 'coins' ? '🪙' : '💵')); return false; }
-  user[currency] -= cost;
-  saveUser({});
-  renderGameCurrency();
-  return true;
-}
-
-document.getElementById('pu-eye').addEventListener('click', () => {
-  if (!gameState || gameState.finished || gameState.currentNumber === null) return;
-  if (!spend(10, 'coins')) return;
-  gameState.tickets.forEach((ticket, ti) => {
-    ticket.forEach((row, ri) => row.forEach((val, ci) => {
-      if (val === gameState.currentNumber) gameState.marks[ti][ri][ci] = true;
-    }));
-  });
-  renderTickets();
-  checkWin();
-});
-
-document.getElementById('pu-x').addEventListener('click', () => {
-  if (!gameState || gameState.finished) return;
-  if (!spend(30, 'coins')) return;
-  gameState.tickets.forEach((ticket, ti) => {
-    ticket.forEach((row, ri) => row.forEach((val, ci) => {
-      if (val !== null && gameState.drawn.includes(val)) gameState.marks[ti][ri][ci] = true;
-    }));
-  });
-  renderTickets();
-  checkWin();
-});
-
-document.getElementById('pu-plus1').addEventListener('click', () => {
-  if (!gameState || gameState.finished) return;
-  if (!spend(1, 'coins')) return;
-  drawNext();
-});
-
-document.getElementById('pu-plus5').addEventListener('click', () => {
-  if (!gameState || gameState.finished) return;
-  if (!spend(50, 'coins')) return;
-  let i = 0;
-  const step = setInterval(() => {
-    drawNext();
-    i++;
-    if (i >= 5 || (gameState && gameState.finished)) clearInterval(step);
-  }, 300);
-});
-
-// ---------- звук (заглушка вкл/выкл) ----------
-let soundOn = true;
-document.getElementById('btn-sound').addEventListener('click', (e) => {
-  soundOn = !soundOn;
-  e.target.textContent = soundOn ? '🔊' : '🔇';
-});
-
-// ---------- старт ----------
+document.getElementById('setup-start').addEventListener('click', () => { closeModal('setup'); startGame('A', 3); });
+document.getElementById('btn-exit-game').addEventListener('click', () => location.reload());
 loadUser();
