@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Лото Онлайн: Классика</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== ГЛАВНОЕ МЕНЮ ===== -->
+  <section id="screen-menu" class="screen active">
+    <div class="menu-top">
+      <div class="avatar-box">
+        <div id="menu-avatar-emoji" class="avatar-emoji"></div>
+        <div class="avatar-name" id="menu-avatar-name">Игрок</div>
+      </div>
+
+      <div class="currency-box">
+        <div class="currency"><span id="cur-bills">0</span> 💵</div>
+        <div class="currency"><span id="cur-coins">0</span> 🪙</div>
+      </div>
+
+      <div class="menu-buttons">
+        <button class="btn" data-modal="daily">Ежедневные награды</button>
+        <button class="btn" data-modal="leaderboard">Лидерборд</button>
+        <button class="btn" data-modal="shop">Магазин</button>
+        <button class="btn" data-modal="marker">Маркер</button>
+        <button class="btn" data-modal="profile">Профиль</button>
+        <button class="btn" data-modal="rules">Правила</button>
+      </div>
+    </div>
+
+    <button id="btn-sound" class="icon-btn">🔊</button>
+    <button id="btn-play" class="btn btn-play">Играть</button>
+  </section>
+
+  <!-- ===== НАСТРОЙКА ИГРЫ (режим + число карточек) ===== -->
+  <div id="modal-setup" class="modal hidden">
+    <div class="modal-box wide">
+      <h2>Настройка игры</h2>
+
+      <h3>Режим игры</h3>
+      <div class="setup-options" id="setup-mode">
+        <label class="setup-option">
+          <input type="radio" name="mode" value="A" checked>
+          <b>А. Простое лото</b> — закрой все 15 чисел на любой карточке первым.
+        </label>
+        <label class="setup-option">
+          <input type="radio" name="mode" value="B">
+          <b>Б. Короткое лото</b> — закрой любую одну строку (5 чисел) первым.
+        </label>
+        <label class="setup-option">
+          <input type="radio" name="mode" value="C">
+          <b>В. Три на три</b> — верхняя строка удваивает банк, средняя строка забирает половину банка, нижняя строка забирает весь банк и делает победителем.
+        </label>
+      </div>
+
+      <h3>Количество карточек</h3>
+      <div class="setup-options row">
+        <label class="setup-option small"><input type="radio" name="cards" value="1"> 1</label>
+        <label class="setup-option small"><input type="radio" name="cards" value="2"> 2</label>
+        <label class="setup-option small"><input type="radio" name="cards" value="3" checked> 3</label>
+      </div>
+
+      <div class="modal-actions">
+        <button id="setup-start" class="btn">Начать игру</button>
+        <button class="btn icon-close" data-close="setup">✖</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ЭКРАН ИГРЫ ===== -->
+  <section id="screen-game" class="screen">
+    <div class="game-top">
+      <button id="btn-exit-game" class="icon-btn">✖</button>
+
+      <div class="powerups">
+        <button class="pbtn" id="pu-eye" title="Отметить текущее число">👁<span>10🪙</span></button>
+        <button class="pbtn" id="pu-plus5" title="Пропустить 5 чисел">+5<span>50🪙</span></button>
+        <button class="pbtn" id="pu-plus1" title="Следующее число">+1<span>1🪙</span></button>
+        <button class="pbtn" id="pu-x" title="Отметить все выпавшие числа">✖<span>30🪙</span></button>
+      </div>
+
+      <div class="currency-box small">
+        <div class="currency"><span id="game-cur-bills">0</span> 💵</div>
+        <div class="currency"><span id="game-cur-coins">0</span> 🪙</div>
+      </div>
+
+      <div class="bank-box hidden" id="bank-box">Банк: <span id="bank-amount">0</span> 💵</div>
+    </div>
+
+    <div class="drum-row">
+      <div class="avatar-box small">
+        <div id="game-player-avatar" class="avatar-emoji"></div>
+        <div class="avatar-name" id="game-player-name"></div>
+      </div>
+
+      <div class="drum-col">
+        <div class="drum" id="drum-number">-</div>
+        <div class="drum-nickname" id="drum-nickname"></div>
+      </div>
+
+      <div class="bots-row" id="bots-row"></div>
+    </div>
+
+    <div class="event-log" id="event-log"></div>
+
+    <div class="history" id="history-row"></div>
+
+    <div id="tickets-container"></div>
+  </section>
+
+  <!-- ===== РЕЗУЛЬТАТ ===== -->
+  <div id="modal-result" class="modal hidden">
+    <div class="modal-box">
+      <h2 id="result-title"></h2>
+      <p id="result-text"></p>
+      <button id="result-close" class="btn">ОК</button>
+    </div>
+  </div>
+
+  <!-- ===== ЕЖЕДНЕВНЫЕ НАГРАДЫ ===== -->
+  <div id="modal-daily" class="modal hidden">
+    <div class="modal-box">
+      <h2>Ежедневные награды</h2>
+      <div class="daily-grid" id="daily-grid"></div>
+      <div class="modal-actions">
+        <button id="daily-claim" class="btn">Получить</button>
+        <button class="btn icon-close" data-close="daily">✖</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ЛИДЕРБОРД ===== -->
+  <div id="modal-leaderboard" class="modal hidden">
+    <div class="modal-box wide">
+      <button class="btn icon-close" data-close="leaderboard">✖</button>
+      <h2>Топ 50</h2>
+      <div id="leaderboard-list" class="leaderboard-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== МАГАЗИН ===== -->
+  <div id="modal-shop" class="modal hidden">
+    <div class="modal-box wide">
+      <button class="btn icon-close" data-close="shop">✖</button>
+      <h2>Магазин</h2>
+      <div id="shop-list" class="shop-list"></div>
+      <button id="shop-ad" class="btn ad-btn">Получить 200 💵 (реклама)</button>
+    </div>
+  </div>
+
+  <!-- ===== МАРКЕР ===== -->
+  <div id="modal-marker" class="modal hidden">
+    <div class="modal-box">
+      <button class="btn icon-close" data-close="marker">✖</button>
+      <h2>Маркер</h2>
+      <div id="marker-grid" class="marker-grid"></div>
+    </div>
+  </div>
+
+  <!-- ===== ПРОФИЛЬ ===== -->
+  <div id="modal-profile" class="modal hidden">
+    <div class="modal-box">
+      <button class="btn icon-close" data-close="profile">✖</button>
+      <h2 id="profile-current-name"></h2>
+      <div id="profile-current-avatar" class="avatar-emoji big"></div>
+      <div id="avatar-grid" class="avatar-grid"></div>
+      <button id="profile-save" class="btn">Сохранить</button>
+    </div>
+  </div>
+
+  <!-- ===== ПРАВИЛА ===== -->
+  <div id="modal-rules" class="modal hidden">
+    <div class="modal-box wide">
+      <button class="btn icon-close" data-close="rules">✖</button>
+      <h2>Правила игры</h2>
+      <div class="rules-text">
+        <p><b>Игровые элементы.</b> 90 бочонков с номерами от 1 до 90. Карточка — 3 строки × 9 колонок, в каждой строке ровно 5 чисел (всего 15 чисел на карточке). Перед игрой можно взять от 1 до 3 карточек.</p>
+        <p><b>Ход игры.</b> Числа вытягиваются по одному и объявляются (иногда — традиционным прозвищем бочонка). Если число есть на вашей карточке — нажмите на клетку, чтобы закрыть её.</p>
+        <p><b>Режим А — Простое лото.</b> Побеждает тот, кто первым закроет все 15 чисел на любой из своих карточек.</p>
+        <p><b>Режим Б — Короткое лото.</b> Побеждает тот, кто первым закроет любую одну строку (5 чисел) на любой из своих карточек.</p>
+        <p><b>Режим В — Три на три.</b> Играется на банк. Кто первым закрывает верхнюю строку — сам ничего не получает, но банк увеличивается за счёт ставок остальных. Кто первым закрывает среднюю строку — забирает половину текущего банка. Кто первым закрывает нижнюю строку — забирает весь оставшийся банк и становится победителем.</p>
+        <p><b>Прозвища бочонков:</b> 1 — «Кол», 3 — «Троечка», 11 — «Барабанные палочки», 12 — «Дюжина», 13 — «Чёртова дюжина», 22 — «Гуси-лебеди», 25 — «Четвертак», 44 — «Стульчики», 50 — «Полтинник», 66 — «Валенки», 77 — «Топорики», 89 — «Дедушкин сосед», 90 — «Дедушка».</p>
+        <p><b>Усиления</b> (за 🪙): 👁 — отметить текущее число автоматически; ✖ — отметить все уже выпавшие, но пропущенные числа; +1 — вытянуть следующее число сразу; +5 — вытянуть 5 чисел подряд.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="script.js"></script>
+</body>
+</html>

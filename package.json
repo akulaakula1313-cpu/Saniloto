@@ -1,0 +1,10 @@
+{
+  "name": "loto-online",
+  "version": "1.0.0",
+  "description": "Серверная игра Лото Онлайн: Классика (без внешних зависимостей)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}
