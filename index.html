@@ -1,261 +1,182 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Лото Онлайн: Классика от SANI GROUP</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #2c3e50; color: #fff; margin: 0; padding: 0; }
-    .screen { display: none; padding: 20px; text-align: center; }
-    .screen.active { display: block; }
-    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
-    .modal.hidden { display: none; }
-    .modal-box { background: #34495e; padding: 20px; border-radius: 10px; max-width: 90%; width: 400px; position: relative; box-sizing: border-box; text-align: center; }
-    .modal-box.wide { width: 650px; }
-    .btn { padding: 10px 20px; background: #e67e22; border: none; color: #fff; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 5px; }
-    .btn:disabled { background: #7f8c8d; cursor: not-allowed; }
-    .icon-btn { font-size: 24px; background: none; border: none; cursor: pointer; }
-    .currency-box { margin: 10px; font-size: 18px; }
-    .hidden { display: none; }
-    .ticket { margin: 15px auto; border-collapse: collapse; background: #fff; color: #000; }
-    .ticket td { width: 40px; height: 40px; border: 1px solid #ccc; text-align: center; font-weight: bold; font-size: 18px; cursor: pointer; }
-    .ticket td.empty { background: #eee; cursor: default; }
-    .ticket td.marked { color: #fff; }
-    .ticket td.drawn-not-marked { background: #ffeaa7; }
-    .grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 15px 0; }
-    .daily-cell, .marker-cell, .avatar-cell { padding: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; cursor: pointer; min-width: 50px; }
-    .daily-cell.claimed { opacity: 0.5; background: #27ae60; }
-    .daily-cell.today { border: 2px solid #f1c40f; }
-    .selected { border: 2px solid #2ecc71; }
-    .lb-row { display: flex; justify-content: space-between; padding: 5px 10px; background: rgba(0,0,0,0.2); margin: 3px 0; border-radius: 3px; }
-    .lb-row.me { background: #2980b9; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Лото Онлайн: Классика от SANI GROUP</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
 
+  <!-- ===== ЭКРАН ПОЛНОГО БАНА ===== -->
+  <div id="screen-banned" class="modal hidden bg-ban-screen">
+    <div class="modal-box style-ban-box">
+      <h1>🚫</h1>
+      <h2>ДОСТУП ОГРАНИЧЕН</h2>
+      <p>Ваш аккаунт заблокирован администрацией <b>SANI GROUP</b> за нарушение правил.</p>
+      <div class="ban-status-badge">Статус: Навсегда (Permanent)</div>
+      <p class="txt-sub">Если это ошибка, обратитесь к создателям игры.</p>
+    </div>
+  </div>
+
   <!-- ===== ГЛАВНОЕ МЕНЮ ===== -->
   <section id="screen-menu" class="screen active">
     <div class="menu-top">
-      <div class="avatar-box" id="btn-admin-login" style="position: relative; cursor: pointer;" title="Админ-панель SANI GROUP">
-        <div id="menu-avatar-emoji" class="avatar-emoji" style="font-size: 50px;">🧑‍🦲</div>
-        <div class="avatar-name" id="menu-avatar-name">Игрок</div>
+      <div class="avatar-box" id="btn-admin-login" title="Админ-панель">
+        <div id="menu-avatar-emoji">🧑‍🦲</div>
+        <div id="menu-avatar-name">Игрок</div>
       </div>
-
       <div class="currency-box">
         <div class="currency"><span id="cur-bills">0</span> 💵</div>
         <div class="currency"><span id="cur-coins">0</span> 🪙</div>
       </div>
-
-      <div class="menu-buttons">
-        <button class="btn" data-modal="daily">Ежедневные награды</button>
-        <button class="btn" data-modal="leaderboard">Лидерборд</button>
-        <button class="btn" data-modal="shop">Магазин</button>
-        <button class="btn" data-modal="marker">Маркер</button>
-        <button class="btn" data-modal="profile">Профиль</button>
-        <button class="btn" data-modal="rules">Правила</button>
-      </div>
     </div>
 
-    <div style="margin-top: 40px; display: flex; gap: 20px; justify-content: center;">
-      <button id="btn-play" class="btn" style="font-size: 20px; padding: 14px 30px;">Играть</button>
-      <button id="btn-open-multiplayer" class="btn" style="font-size: 20px; padding: 14px 30px; background: linear-gradient(#2ecc71, #27ae60);">👥 Стол друзей</button>
+    <div class="menu-buttons">
+      <button class="btn" data-modal="daily">Ежедневные награды</button>
+      <button class="btn" data-modal="leaderboard">Лидерборд</button>
+      <button class="btn" data-modal="shop">Магазин валюты</button>
+      <button class="btn" data-modal="marker">Маркер фишек</button>
+      <button class="btn" data-modal="profile">Профиль игрока</button>
+      <button class="btn" data-modal="rules">Правила игры</button>
     </div>
 
-    <div style="margin-top: 30px; display: flex; gap: 10px; justify-content: center;">
+    <div class="play-action-container">
+      <button id="btn-play" class="btn btn-main-play">Играть с ботами</button>
+    </div>
+
+    <div class="fixed-controls">
       <button id="btn-sound" class="icon-btn">🔊</button>
-      <button id="btn-open-global-chat" class="icon-btn">💬</button>
+      <button id="btn-open-global-chat" class="icon-btn btn-blue-chat">💬</button>
     </div>
   </section>
 
   <!-- ===== ОКНО ОБЩЕГО ЧАТА ===== -->
-  <div id="modal-global-chat" class="modal hidden">
-    <div class="modal-box" style="border: 3px solid #3498db;">
-      <button class="btn" id="btn-close-global-chat" style="position: absolute; right: 15px; top: 15px; background: #e74c3c;">✖</button>
+  <div id="modal-global-chat" class="modal hidden flex-center">
+    <div class="modal-box chat-modal-box">
+      <button class="btn btn-close-danger" id="btn-close-global-chat">✖</button>
       <h3>💬 Общий ЧАТ SANI GROUP</h3>
-      <div id="global-chat-messages" style="height: 200px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; text-align: left; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;"></div>
-      <div style="display: flex; gap: 8px;">
-        <input type="text" id="global-chat-input" placeholder="Напишите сообщение..." style="flex: 1; padding: 8px; border-radius: 6px; border: none; color: #000;">
-        <button id="btn-global-chat-send" class="btn" style="padding: 6px 15px;">Отправить</button>
+      <div id="global-chat-messages" class="chat-messages-container"></div>
+      <div class="chat-input-row">
+        <input type="text" id="global-chat-input" placeholder="Напишите сообщение...">
+        <button id="btn-global-chat-send" class="btn">Отправить</button>
       </div>
     </div>
   </div>
 
-  <!-- ===== МОДАЛЬНЫЕ ОКНА ИГРЫ ===== -->
-  <div id="modal-daily" class="modal hidden">
-    <div class="modal-box">
-      <h2>Ежедневные награды</h2>
-      <div id="daily-grid" class="grid"></div>
-      <button id="daily-claim" class="btn">Забрать награду</button>
-      <button class="btn" data-close="daily">Закрыть</button>
+  <!-- ===== МОДАЛЬНЫЕ ОКНА СЕРВИСОВ ===== -->
+  <div id="modal-daily" class="modal hidden flex-center">
+    <div class="modal-box block-dark">
+      <h2>📆 Награды за вход</h2>
+      <div id="daily-grid" class="daily-reward-grid"></div>
+      <div class="modal-btns">
+        <button id="daily-claim" class="btn btn-green">Получить</button>
+        <button class="btn" data-close="daily">Закрыть</button>
+      </div>
     </div>
   </div>
 
-  <div id="modal-leaderboard" class="modal hidden">
-    <div class="modal-box">
-      <h2>Топ 50 Игроков</h2>
-      <div id="leaderboard-list" style="max-height: 300px; overflow-y: auto;"></div>
+  <div id="modal-leaderboard" class="modal hidden flex-center">
+    <div class="modal-box block-dark">
+      <h2>🏆 Топ 50 Лидеров</h2>
+      <div id="leaderboard-list" class="scroll-list"></div>
       <button class="btn" data-close="leaderboard">Закрыть</button>
     </div>
   </div>
 
-  <div id="modal-shop" class="modal hidden">
-    <div class="modal-box">
-      <h2>Магазин монет</h2>
-      <div id="shop-list"></div>
+  <div id="modal-shop" class="modal hidden flex-center">
+    <div class="modal-box block-dark">
+      <h2>🛒 Обмен монет на баксы</h2>
+      <div id="shop-list" class="flex-column-gap"></div>
       <button class="btn" data-close="shop">Закрыть</button>
     </div>
   </div>
 
-  <div id="modal-marker" class="modal hidden">
-    <div class="modal-box">
-      <h2>Цвет маркера</h2>
-      <div id="marker-grid" class="grid"></div>
+  <div id="modal-marker" class="modal hidden flex-center">
+    <div class="modal-box block-dark">
+      <h2>🖌️ Выбор цвета маркера</h2>
+      <div id="marker-grid" class="marker-selection-grid"></div>
       <button class="btn" data-close="marker">Закрыть</button>
     </div>
   </div>
 
-  <div id="modal-profile" class="modal hidden">
-    <div class="modal-box">
-      <h2>👤 Профиль игрока</h2>
-      <input type="text" id="profile-name-input" style="padding: 8px; font-size: 16px; color:#000;"><br><br>
-      <div id="profile-current-avatar" style="font-size: 40px; margin-bottom: 10px;">🧑‍🦲</div>
-      <div id="avatar-grid" class="grid"></div>
-      <button id="profile-save" class="btn">Сохранить</button>
-      <button class="btn" data-close="profile">Закрыть</button>
+  <div id="modal-profile" class="modal hidden flex-center">
+    <div class="modal-box block-dark text-center">
+      <h2>👤 Настройка профиля</h2>
+      <input type="text" id="profile-name-input" maxlength="15"><br>
+      <div id="profile-current-avatar">🧑‍🦲</div>
+      <div id="avatar-grid" class="avatar-selection-grid"></div>
+      <button id="profile-save" class="btn btn-green">Сохранить</button>
+      <button class="btn" data-close="profile">Отмена</button>
     </div>
   </div>
 
-  <div id="modal-rules" class="modal hidden">
-    <div class="modal-box">
+  <div id="modal-rules" class="modal hidden flex-center">
+    <div class="modal-box block-dark text-left">
       <h2>Правила игры</h2>
-      <p>Числа вытягиваются автоматически каждые 4 секунды. Нажмите на клетку карточки, чтобы закрыть её, если число уже выпало.</p>
+      <p>Числа выходят из барабана автоматически каждые 4 секунды. Нажимайте на числа на ваших карточках, чтобы закрывать их маркером.</p>
+      <p>Побеждает тот, кто первый закроет все сгенерированные числа в билете!</p>
       <hr>
-      <p>⚙️ РАЗРАБОТЧИК ИГРЫ: SANI GROUP<br>Все права защищены © 2026</p>
-      <button class="btn" data-close="rules">ОК</button>
+      <p>⚙️ Разработчик: SANI GROUP © 2026</p>
+      <button class="btn" data-close="rules">Понятно</button>
     </div>
   </div>
 
-  <!-- ===== НАСТРОЙКА ИГРЫ (ПЕРЕД СТАРТОМ) ===== -->
-  <div id="modal-setup" class="modal hidden">
-    <div class="modal-box wide">
-      <h2>Настройка игры</h2>
-      <h3>Режим игры</h3>
-      <div id="setup-mode">
-        <label><input type="radio" name="mode" value="A" checked> <b>А. Простое лото</b></label><br>
-        <label><input type="radio" name="mode" value="B"> <b>Б. Короткое лото</b></label><br>
-        <label><input type="radio" name="mode" value="C"> <b>В. Три на три</b></label>
-      </div>
-      <h3>Количество карточек</h3>
-      <select id="setup-cards-count" style="padding: 5px; font-size: 16px; color:#000;">
-        <option value="1">1 Карточка</option>
-        <option value="2">2 Карточки</option>
-        <option value="3" selected>3 Карточки</option>
-      </select>
-      <br><br>
-      <button id="setup-start" class="btn">Начать игру</button>
+  <!-- ===== НАСТРОЙКА ИГРЫ ===== -->
+  <div id="modal-setup" class="modal hidden flex-center">
+    <div class="modal-box block-dark text-center">
+      <h2>Начать игру лото</h2>
+      <p>Вы получите 3 случайные карточки игрока.</p>
+      <button id="setup-start" class="btn btn-green padding-large">Войти в игру</button>
       <button class="btn" data-close="setup">Отмена</button>
     </div>
   </div>
 
-  <!-- ===== СИСТЕМА УВЕДОМЛЕНИЙ / ПОДАРКОВ ===== -->
-  <div id="modal-gift-alert" class="modal hidden" style="z-index: 200;">
-    <div class="modal-box" id="gift-alert-box" style="background: linear-gradient(#e67e22, #d35400);">
-      <h1 id="gift-alert-icon" style="font-size: 50px; margin: 0;">🎁</h1>
-      <h2 id="gift-alert-title">Уведомление</h2>
-      <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px; margin: 15px 0;">
-        <p id="gift-alert-text"></p>
-        <div id="gift-currency-show" style="display: flex; justify-content: center; gap: 20px; font-weight: bold; font-size: 20px;">
-          <span id="gift-alert-bills">0 💵</span>
-          <span id="gift-alert-coins">0 🪙</span>
-        </div>
-      </div>
-      <button id="btn-close-gift-alert" class="btn" style="background:#ffd23f; color:#000;">Понятно</button>
+  <!-- ===== ЭКРАН ИГРЫ ЛОТО ===== -->
+  <section id="screen-game" class="screen page-game-layout" style="display:none;">
+    <div class="game-top">
+      <button id="btn-exit-game" class="btn btn-danger-exit">Выйти в меню ✖</button>
+      <div id="drum-number">-</div>
+      <div id="drum-nickname" class="nickname-barrel"></div>
+      <div class="currency-box"><span id="game-cur-bills">0</span> 💵</div>
     </div>
-  </div>
-
-  <!-- ===== АДМИН-ПАНЕЛЬ ===== -->
-  <div id="modal-admin" class="modal hidden">
-    <div class="modal-box wide" style="background:#2c3e50;">
-      <h2>👑 Админ-панель SANI GROUP</h2>
-      <div id="admin-auth-block">
-        <input type="password" id="admin-password-input" placeholder="Пароль админа" style="padding: 8px; color:#000; text-align:center; width:200px;"><br><br>
-        <button id="btn-admin-auth" class="btn">Войти</button>
-      </div>
-      <div id="admin-panel-block" class="hidden" style="text-align: left;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:rgba(0,0,0,0.2); padding:8px; border-radius:6px;">
-          <span>Опасная зона:</span>
-          <button class="btn" id="btn-admin-clear-top" style="background:#e74c3c;">Обнулить балансы всех игроков</button>
-        </div>
-        <h3>Список игроков на сервере:</h3>
-        <div id="admin-players-list" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; display:flex; flex-direction:column; gap:10px;"></div>
-      </div>
-      <div class="modal-actions" style="margin-top:15px;"><button class="btn" id="btn-close-admin">Закрыть</button></div>
-    </div>
-  </div>
-
-  <!-- ===== СТОЛ ДРУЗЕЙ ===== -->
-  <div id="modal-multiplayer" class="modal hidden">
-    <div class="modal-box">
-      <h2>👥 Стол Лото с Друзьями</h2>
-      <div id="multi-create-block">
-        <h3>Создать новый стол:</h3>
-        <label>Мест за столом (2-6):</label>
-        <input type="number" id="multi-max-players" min="2" max="6" value="2" style="width: 50px; padding: 5px; color:#000;"><br><br>
-        <label>Ставка стола (💵):</label>
-        <input type="number" id="multi-stake" min="100" max="5000" step="100" value="300" style="width: 80px; padding: 5px; color:#000;"><br><br>
-        <button id="btn-multi-create" class="btn">Получить номер стола</button>
-      </div>
-      <hr style="margin: 15px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.2);">
-      <div id="multi-join-block">
-        <h3>Подключиться к другу:</h3>
-        <input type="text" id="multi-room-id" placeholder="4 цифры" maxlength="4" style="font-size: 20px; width: 120px; text-align: center; padding: 5px; color:#000;"><br><br>
-        <button id="btn-multi-join" class="btn">Войти за стол</button>
-      </div>
-      <div id="multi-waiting-block" class="hidden">
-        <h1 style="color: #ffd23f; font-size: 40px; margin: 10px 0;" id="txt-table-code">0000</h1>
-        <p>Передайте этот код друзьям!</p>
-        <div id="multi-players-list" style="text-align: left; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;"></div>
-      </div>
-      <div class="modal-actions" style="margin-top: 15px;"><button class="btn" id="btn-close-multiplayer">Выйти</button></div>
-    </div>
-  </div>
-
-  <!-- ===== ЭКРАН ИГРЫ ===== -->
-  <section id="screen-game" class="screen">
-    <div class="game-top" style="display: flex; justify-content: space-between; align-items: center;">
-      <button id="btn-exit-game" class="btn" style="background:#e74c3c;">✖ Выйти</button>
-      <div class="currency-box small">
-        <div><span id="game-cur-bills">0</span> 💵</div>
-        <div><span id="game-cur-coins">0</span> 🪙</div>
-      </div>
-      <div class="bank-box hidden" id="bank-box">Банк: <span id="bank-amount">0</span> 💵</div>
-    </div>
-
-    <div class="drum-row" style="margin: 20px 0;">
-      <div id="game-player-avatar" style="font-size: 40px;">🧑‍🦲</div>
-      <div id="game-player-name" style="font-size: 18px; font-weight: bold;"></div>
-      <div style="margin: 15px 0;">
-        <div class="drum" id="drum-number" style="font-size: 60px; font-weight: bold; color: #f1c40f;">-</div>
-        <div class="drum-nickname" id="drum-nickname" style="font-style: italic; color: #b2bec3;"></div>
-      </div>
-    </div>
-
-    <div class="event-log" id="event-log" style="color: #e67e22; margin-bottom: 10px;"></div>
     <div id="tickets-container"></div>
-
-    <!-- ЧАТ ВНУТРИ ИГРОВОЙ КОМНАТЫ -->
-    <div id="room-chat-container" class="hidden" style="margin: 15px auto; max-width: 500px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px; border: 2px solid #e67e22;">
-      <div id="room-chat-messages" style="height: 80px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 6px; text-align: left; font-size: 13px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;"></div>
-      <div style="display: flex; gap: 6px;">
-        <input type="text" id="room-chat-input" placeholder="Сообщение стола..." style="flex: 1; padding: 6px; border-radius: 5px; border: none; color: #000;">
-        <button id="btn-room-chat-send" class="btn" style="padding: 4px 10px; font-size: 12px; margin:0;">Отправить</button>
-      </div>
-    </div>
   </section>
 
-</div>
+  <!-- ===== УВЕДОМЛЕНИЕ О ПОДАРКЕ ===== -->
+  <div id="modal-gift-alert" class="modal hidden gift-alert-overlay">
+    <div class="modal-box gift-gradient-box">
+      <h1>🎁</h1>
+      <h2>Вам подарок от SANI GROUP!</h2>
+      <div class="gift-amounts-row">
+        <span id="gift-alert-bills">+0 💵</span> | <span id="gift-alert-coins">+0 🪙</span>
+      </div>
+      <button id="btn-close-gift-alert" class="btn btn-orange-gift">Спасибо! ❤️</button>
+    </div>
+  </div>
 
+  <!-- ===== ПРОДВИНУТАЯ АДМИН-ПАНЕЛЬ ===== -->
+  <div id="modal-admin" class="modal hidden flex-center">
+    <div class="modal-box admin-modal-box">
+      <h2>👑 Панель Управления SANI GROUP</h2>
+      
+      <div id="admin-auth-block">
+        <input type="password" id="admin-password-input" placeholder="Введите пароль админа"><br><br>
+        <button id="btn-admin-auth" class="btn btn-green">Войти в систему</button>
+      </div>
+
+      <div id="admin-panel-block" class="hidden">
+        <div id="admin-players-list" class="admin-users-list-wrapper"></div>
+      </div>
+      
+      <div class="admin-panel-footer" style="margin-top: 15px;">
+        <button class="btn btn-danger-exit" id="btn-close-admin">Закрыть панель</button>
+      </div>
+    </div>
+  </div>
+
+</div>
 <script src="script.js"></script>
 </body>
 </html>
