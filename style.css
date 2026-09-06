@@ -15,17 +15,8 @@ body {
 
 #app { position: relative; min-height: 100vh; }
 
-/* Правила скрытия экранов и модалок */
 .screen { display: none; padding: 20px; }
 .screen.active { display: block; }
-
-.modal {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.55);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 50;
-}
-.modal.hidden, .hidden { display: none !important; }
 
 /* ---------- кнопки ---------- */
 .btn {
@@ -52,6 +43,7 @@ body {
   border-radius: 8px;
   cursor: pointer;
 }
+
 .icon-close { margin-left: 8px; }
 
 /* ---------- меню ---------- */
@@ -96,7 +88,15 @@ body {
   padding: 14px 50px;
 }
 
-/* ---------- модальные коробки ---------- */
+/* ---------- модалки ---------- */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal.hidden { display: none; }
+
 .modal-box {
   background: linear-gradient(#a86a3d, #8a5228);
   border: 3px solid #4a2c14;
@@ -114,8 +114,18 @@ body {
 .modal-actions { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
 
 /* ежедневные награды */
-.daily-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.daily-cell { background: #f4e0bd; color: #4a2c14; border-radius: 8px; padding: 10px 4px; font-weight: bold; }
+.daily-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.daily-cell {
+  background: #f4e0bd;
+  color: #4a2c14;
+  border-radius: 8px;
+  padding: 10px 4px;
+  font-weight: bold;
+}
 .daily-cell.today { background: #6fd66f; color: #fff; }
 .daily-cell.claimed { background: #b7935f; color: #fff; }
 .daily-cell .d-num { font-size: 12px; }
@@ -123,7 +133,10 @@ body {
 
 /* лидерборд */
 .leaderboard-list { text-align: left; max-height: 60vh; overflow-y: auto; }
-.lb-row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.15); }
+.lb-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,.15);
+}
 .lb-row .lb-rank { width: 24px; font-weight: bold; }
 .lb-row .lb-emoji { font-size: 26px; width: 34px; text-align: center; }
 .lb-row .lb-name { flex: 1; }
@@ -131,59 +144,127 @@ body {
 
 /* магазин */
 .shop-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.shop-row { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,.3); padding: 8px 14px; border-radius: 8px; }
+.shop-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(0,0,0,.3); padding: 8px 14px; border-radius: 8px;
+}
+.ad-btn { width: 100%; }
 
 /* маркеры */
 .marker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-.marker-cell { background: rgba(0,0,0,.3); border-radius: 8px; padding: 14px; cursor: pointer; border: 3px solid transparent; }
+.marker-cell {
+  background: rgba(0,0,0,.3);
+  border-radius: 8px; padding: 14px;
+  cursor: pointer; border: 3px solid transparent;
+}
 .marker-cell.selected { border-color: #ffd23f; }
 .marker-cell .m-dot { width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 8px; }
+.marker-cell .m-cost { font-size: 12px; }
 .marker-cell.locked { opacity: .85; }
 
 /* профиль */
 .avatar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px 0; }
-.avatar-cell { font-size: 30px; background: rgba(0,0,0,.3); border: 3px solid transparent; border-radius: 8px; padding: 8px 0; cursor: pointer; }
+.avatar-cell {
+  font-size: 30px;
+  background: rgba(0,0,0,.3);
+  border: 3px solid transparent;
+  border-radius: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+}
 .avatar-cell.selected { border-color: #ffd23f; }
+
+.rules-text p { text-align: left; margin: 8px 0; }
 
 /* настройка игры */
 .setup-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; text-align: left; }
 .setup-options.row { flex-direction: row; justify-content: center; gap: 20px; }
-.setup-option { background: rgba(0,0,0,.25); border-radius: 8px; padding: 10px 14px; display: block; cursor: pointer; }
+.setup-option {
+  background: rgba(0,0,0,.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: block;
+  cursor: pointer;
+}
 .setup-option.small { width: 60px; text-align: center; }
+.setup-option input { margin-right: 8px; }
+.modal-box h3 { margin: 14px 0 6px; text-align: left; }
 
 /* банк */
-.bank-box { background: rgba(0,0,0,.35); padding: 6px 14px; border-radius: 20px; font-weight: bold; color: #ffd23f; }
+.bank-box {
+  background: rgba(0,0,0,.35);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: bold;
+  color: #ffd23f;
+}
+.hidden { display: none !important; }
+
+/* бочонок + прозвище */
+.drum-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.drum-nickname { font-size: 13px; font-style: italic; min-height: 16px; color: #ffe6b0; }
+
+/* лог событий */
+.event-log { text-align: center; min-height: 20px; font-size: 13px; color: #ffe6b0; margin-bottom: 6px; }
 
 /* ---------- экран игры ---------- */
 .game-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .powerups { display: flex; gap: 8px; flex-wrap: wrap; }
 .pbtn {
-  background: linear-gradient(#f5a83b, #e8860c); border: 2px solid #c96a00; border-radius: 8px;
-  color: #fff; font-weight: bold; padding: 8px 10px; cursor: pointer;
+  background: linear-gradient(#f5a83b, #e8860c);
+  border: 2px solid #c96a00;
+  border-radius: 8px;
+  color: #fff; font-weight: bold;
+  padding: 8px 10px;
+  cursor: pointer;
   display: flex; flex-direction: column; align-items: center; font-size: 15px;
 }
 .pbtn span { font-size: 11px; font-weight: normal; }
+.pbtn:disabled { opacity: .5; cursor: not-allowed; }
 
 .drum-row { display: flex; align-items: center; justify-content: center; gap: 30px; margin: 16px 0; flex-wrap: wrap; }
 .drum {
-  width: 90px; height: 90px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #f7e2b0, #c98a3a 70%, #7a4a1c); border: 4px solid #4a2c14;
-  display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: bold; color: #2b1608;
+  width: 90px; height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f7e2b0, #c98a3a 70%, #7a4a1c);
+  border: 4px solid #4a2c14;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; font-weight: bold; color: #2b1608;
 }
 .bots-row { display: flex; gap: 16px; }
 .bot-box { text-align: center; }
+.bot-box .avatar-emoji { font-size: 34px; }
+.bot-progress { font-size: 12px; margin-top: 2px; }
 
 .history { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; min-height: 26px; }
-.history span { background: rgba(0,0,0,.35); border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.history span {
+  background: rgba(0,0,0,.35);
+  border-radius: 50%;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
 
 #tickets-container { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-.ticket { border-collapse: collapse; background: #fff; }
+.ticket {
+  border-collapse: collapse;
+  background: #fff;
+}
 .ticket td {
-  width: 40px; height: 40px; border: 1px solid #444; text-align: center;
-  vertical-align: middle; color: #222; font-weight: bold; font-size: 15px; cursor: pointer; user-select: none;
+  width: 40px; height: 40px;
+  border: 1px solid #444;
+  text-align: center;
+  vertical-align: middle;
+  color: #222;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
 }
 .ticket td.empty { background: #ddd; cursor: default; }
-.ticket td.marked { color: #fff; }
+.ticket td.marked {
+  color: #fff;
+}
 .ticket td.drawn-not-marked { outline: 2px solid #ffd23f; outline-offset: -2px; }
 
 @media (max-width: 500px) {
