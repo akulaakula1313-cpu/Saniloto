@@ -1,19 +1,18 @@
 const AVATARS = ['🧑‍🦲', '👩‍🦰', '👩', '🧕', '👩🏻‍🦳', '👨🏽', '🧑‍🦱', '👱', '🧔', '🧑‍🦰'];
 const MARKERS = [
-  { id: 0, color: '#8e44ad', cost: 0 },
-  { id: 1, color: '#c0392b', cost: 15000 },
-  { id: 2, color: '#2980b9', cost: 15000 },
-  { id: 3, color: '#27ae60', cost: 15000 }
+  { id: 0, color: '#e74c3c', cost: 0, name: "Рубин" },
+  { id: 1, color: '#2ecc71', cost: 15000, name: "Изумруд" },
+  { id: 2, color: '#3498db', cost: 15000, name: "Сапфир" },
+  { id: 3, color: '#f1c40f', cost: 15000, name: "Янтарь" }
 ];
 const DAILY_REWARDS = [
   { icon: '💵', text: '500' }, { icon: '💵', text: '1000' }, { icon: '🪙', text: '10' },
   { icon: '💵', text: '1500' }, { icon: '🪙', text: '30' }, { icon: '💵', text: '3000' }, { icon: '🪙', text: '45' }
 ];
 const SHOP_ITEMS = [
-  { bills: 500, coins: 10 }, { bills: 1000, coins: 15 }, { bills: 2000, coins: 29 }, { bills: 4000, coins: 49 }, { bills: 10000, coins: 79 }
+  { bills: 500, coins: 10 }, { bills: 1000, coins: 15 }, { bills: 2000, coins: 29 }, { bills: 4000, coins: 49 }
 ];
 const DRAW_INTERVAL = 4000;
-const STAKE = 300;
 
 const NICKNAMES = {
   1: 'Кол', 3: 'Троечка', 11: 'Барабанные палочки', 12: 'Дюжина', 13: 'Чёртова дюжина',
@@ -35,14 +34,13 @@ async function loadUser() {
   user = data;
 
   if (user.isBanned) {
-    showGiftNotifications({ from: "СИСТЕМА БЕЗОПАСНОСТИ", bills: 0, coins: 0, msg: "Ваш аккаунт заблокирован! Причина: " + (user.banReason || 'Нарушение правил') });
-    document.getElementById('app').style.opacity = "0.5";
+    showGiftNotifications({ from: "СИСТЕМА БЕЗОПАСНОСТИ", bills: 0, coins: 0, msg: "Ваш профиль заблокирован! Причина: " + (user.banReason || 'Нарушение правил') });
+    document.getElementById('app').style.opacity = "0.4";
     document.getElementById('app').style.pointerEvents = "none";
     return;
   }
 
   renderMenu();
-  if (user.pendingGifts && user.pendingGifts.length > 0) showGiftNotifications(user.pendingGifts);
 }
 
 function saveUser(patch) {
@@ -78,7 +76,9 @@ function openModal(name) {
   if (name === 'profile') renderProfile();
 }
 
-document.querySelectorAll('[data-modal]').forEach(btn => btn.addEventListener('click', () => openModal(btn.dataset.modal)));
+document.querySelectorAll('[data-modal]').forEach(btn => {
+  btn.addEventListener('click', () => openModal(btn.dataset.modal));
+});
 
 function renderDaily() {
   const grid = document.getElementById('daily-grid');
@@ -93,7 +93,7 @@ function renderDaily() {
     cell.className = 'daily-cell';
     if (i < today) cell.classList.add('claimed');
     if (i === today) cell.classList.add('today');
-    cell.innerHTML = "<div class='d-num'>" + (i + 1) + "</div><div class='d-icon'>" + r.icon + "</div><div>" + r.text + "</div>";
+    cell.innerHTML = `<div>День ${i + 1}</div><div style="font-size:24px; margin:5px 0;">${r.icon}</div><div>${r.text}</div>`;
     grid.appendChild(cell);
   });
   document.getElementById('daily-claim').disabled = !canClaim;
@@ -112,15 +112,14 @@ document.getElementById('daily-claim').addEventListener('click', async () => {
 async function renderLeaderboard() {
   const list = document.getElementById('leaderboard-list');
   if (!list) return;
-  list.innerHTML = 'Загрузка...';
+  list.innerHTML = '<div style="color:#fff;">Загрузка топа...</div>';
   const res = await fetch('/api/leaderboard');
   const data = await res.json();
   list.innerHTML = '';
   data.forEach((row, i) => {
     const div = document.createElement('div');
-    div.className = 'lb-row' + (row.name === user.name ? ' me' : '');
-    div.style.padding = "5px 0";
-    div.innerHTML = "<div>" + (i + 1) + ". " + row.name + " — " + row.score + " 💵</div>";
+    div.className = 'leaderboard-row-item' + (row.name === user.name ? ' current-player-row' : '');
+    div.innerHTML = `<span>${i + 1}. 👤 ${row.name}</span><b>${row.score} 💵</b>`;
     list.appendChild(div);
   });
 }
@@ -131,10 +130,10 @@ function renderShop() {
   list.innerHTML = '';
   SHOP_ITEMS.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'shop-row';
-    row.innerHTML = "<span>" + item.bills + " 💵</span><button class='btn'>" + item.coins + " 🪙</button>";
+    row.className = 'shop-goods-card';
+    row.innerHTML = `<span>${item.bills} 💵</span><button class="btn-submit">${item.coins} 🪙</button>`;
     row.querySelector('button').addEventListener('click', () => {
-      if (user.bills < item.bills) { alert('Недостаточно денег!'); return; }
+      if (user.bills < item.bills) { alert('Недостаточно валюты!'); return; }
       saveUser({ bills: user.bills - item.bills, coins: user.coins + item.coins });
       renderShop();
     });
@@ -149,12 +148,10 @@ function renderMarkers() {
   MARKERS.forEach(m => {
     const owned = user.unlockedMarkers.includes(m.id);
     const cell = document.createElement('div');
-    cell.style.padding = "10px";
-    cell.style.background = m.color;
-    cell.style.borderRadius = "8px";
-    cell.style.cursor = "pointer";
-    cell.innerHTML = "<div>" + (owned ? (user.marker === m.id ? 'Выбран' : 'Взять') : m.cost + ' 💵') + "</div>";
-    cell.addEventListener('click', () => {
+    cell.className = 'marker-color-palette-node' + (user.marker === m.id ? ' marker-active-border' : '');
+    cell.style.borderLeft = `8px solid ${m.color}`;
+    cell.innerHTML = `<div><b>${m.name}</b></div><button class="btn-submit" style="font-size:12px; padding:4px 8px; margin-top:5px;">${owned ? (user.marker === m.id ? 'Выбран' : 'Взять') : m.cost + ' 💵'}</button>`;
+    cell.querySelector('button').addEventListener('click', () => {
       if (owned) saveUser({ marker: m.id });
       else if (user.bills >= m.cost) saveUser({ bills: user.bills - m.cost, unlockedMarkers: [...user.unlockedMarkers, m.id], marker: m.id });
       renderMarkers();
@@ -173,14 +170,18 @@ function renderProfile() {
   let picked = user.avatar;
   AVATARS.forEach((emoji, i) => {
     const cell = document.createElement('div');
-    cell.style.fontSize = "24px";
-    cell.style.cursor = "pointer";
+    cell.className = 'avatar-matrix-cell' + (i === picked ? ' avatar-active' : '');
     cell.textContent = emoji;
-    cell.addEventListener('click', () => { picked = i; document.getElementById('profile-current-avatar').textContent = emoji; });
+    cell.addEventListener('click', () => { 
+      picked = i; 
+      document.querySelectorAll('.avatar-matrix-cell').forEach(c => c.classList.remove('avatar-active'));
+      cell.classList.add('avatar-active');
+      document.getElementById('profile-current-avatar').textContent = emoji; 
+    });
     grid.appendChild(cell);
   });
   document.getElementById('profile-save').onclick = () => {
-    if (!input.value.trim()) return alert('Ник не должен быть пустым!');
+    if (!input.value.trim()) return alert('Имя не должно быть пустым!');
     saveUser({ name: input.value.trim(), avatar: picked });
     document.getElementById('modal-profile').classList.add('hidden');
   };
@@ -195,8 +196,11 @@ function generateTicket() {
       if (grid[r][c] === null) {
         let min = c === 0 ? 1 : c * 10;
         let max = c === 8 ? 90 : c * 10 + 9;
-        grid[r][c] = Math.floor(Math.random() * (max - min + 1)) + min;
-        placed++;
+        let num = Math.floor(Math.random() * (max - min + 1)) + min;
+        if (!grid.some(row => row[c] === num)) {
+          grid[r][c] = num;
+          placed++;
+        }
       }
     }
   }
@@ -229,12 +233,12 @@ function startGame(mode, numCards) {
     gameState.drawn.push(n); 
     gameState.currentNumber = n;
     document.getElementById('drum-number').textContent = n;
-    document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `«\${NICKNAMES[n]}»` : '';
+    document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `«${NICKNAMES[n]}»` : '';
     renderTickets();
 
     if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) {
       clearInterval(gameState.timer); 
-      alert("Вы победили!");
+      alert("🎉 Ура! Вы закрыли карточку лото!");
     }
   }, DRAW_INTERVAL);
 }
@@ -242,27 +246,27 @@ function startGame(mode, numCards) {
 function renderTickets() {
   const container = document.getElementById('tickets-container'); 
   container.innerHTML = '';
-  const markerColor = MARKERS.find(m => m.id === user.marker)?.color || '#8e44ad';
+  const markerColor = MARKERS.find(m => m.id === user.marker)?.color || '#e74c3c';
 
   gameState.tickets.forEach((ticket, ti) => {
     const table = document.createElement('table'); 
-    table.className = 'ticket';
+    table.className = 'ticket-board';
     ticket.forEach((row, ri) => {
       const tr = document.createElement('tr');
       row.forEach((val, ci) => {
         const td = document.createElement('td');
-        if (val === null) td.className = 'empty';
+        if (val === null) td.className = 'empty-slot';
         else {
           td.textContent = val;
-          if (gameState.marks[ti][ri][ci]) { 
-            td.classList.add('marked'); 
-            td.style.background = markerColor; 
+          if (gameState.marks[ti][ri][ci]) {
+            td.classList.add('chip-marked');
+            td.style.background = markerColor;
           } else if (gameState.drawn.includes(val)) {
-            td.classList.add('drawn-not-marked');
+            td.classList.add('missed-number-alert');
           }
           td.addEventListener('click', () => {
             if (!gameState.drawn.includes(val) || gameState.marks[ti][ri][ci]) return;
-            gameState.marks[ti][ri][ci] = true; 
+            gameState.marks[ti][ri][ci] = true;
             renderTickets();
           });
         }
@@ -275,10 +279,10 @@ function renderTickets() {
 }
 
 function ticketFullyMarked(t, m) {
-  for(let r=0; r<3; r++) { 
-    for(let c=0; c<9; c++) { 
-      if (t[r][c] !== null && !m[r][c]) return false; 
-    } 
+  for(let r=0; r<3; r++) {
+    for(let c=0; c<9; c++) {
+      if (t[r][c] !== null && !m[r][c]) return false;
+    }
   }
   return true;
 }
@@ -286,6 +290,7 @@ function ticketFullyMarked(t, m) {
 document.getElementById('btn-open-multiplayer').addEventListener('click', () => {
   document.getElementById('modal-multiplayer').classList.remove('hidden');
 });
+
 document.getElementById('btn-close-multiplayer').addEventListener('click', () => {
   document.getElementById('modal-multiplayer').classList.add('hidden');
   if (multiSyncInterval) clearInterval(multiSyncInterval);
@@ -297,7 +302,7 @@ document.getElementById('btn-multi-create').addEventListener('click', async () =
   const res = await fetch('/api/room/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, maxPlayers, stake }) });
   const data = await res.json();
   if (data.error) return alert(data.error);
-  user.bills = data.userBalance; 
+  user.bills = data.userBalance;
   renderMenu();
   startWaiting(data.roomId);
 });
@@ -324,18 +329,17 @@ async function syncRoom() {
   const res = await fetch('/api/room/sync?roomId=' + currentRoomId);
   if (!res.ok) return clearInterval(multiSyncInterval);
   const room = await res.json();
-  document.getElementById('multi-players-list').innerHTML = room.players.map(p => "<div>🧑‍💻 " + p.name + "</div>").join('');
-  if (room.status === 'playing') { 
-    clearInterval(multiSyncInterval); 
-    document.getElementById('modal-multiplayer').classList.add('hidden'); 
-    startMultiGame(room); 
+  document.getElementById('multi-players-list').innerHTML = room.players.map(p => `<div style="padding:6px; background:rgba(255,255,255,0.1); margin-bottom:4px; border-radius:4px;">🧑‍💻 ${p.name}</div>`).join('');
+  if (room.status === 'playing') {
+    clearInterval(multiSyncInterval);
+    document.getElementById('modal-multiplayer').classList.add('hidden');
+    startMultiGame(room);
   }
 }
 
 function startMultiGame(room) {
   document.getElementById('screen-menu').classList.remove('active');
   document.getElementById('screen-game').classList.add('active');
-  document.getElementById('room-chat-container').classList.remove('hidden');
   gameState = {
     mode: 'A',
     tickets: [generateTicket()],
@@ -344,7 +348,6 @@ function startMultiGame(room) {
     bank: room.bank
   };
   renderTickets();
-
   multiSyncInterval = setInterval(async () => {
     const res = await fetch('/api/room/sync?roomId=' + currentRoomId);
     const rState = await res.json();
@@ -354,19 +357,16 @@ function startMultiGame(room) {
       document.getElementById('drum-number').textContent = last;
       renderTickets();
     }
-    if (rState.chat) {
-      document.getElementById('room-chat-messages').innerHTML = rState.chat.map(m=> "<div>" + m.name + ": " + m.text + "</div>").join('');
-    }
     if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) {
-      clearInterval(multiSyncInterval); 
+      clearInterval(multiSyncInterval);
       saveUser({ bills: user.bills + gameState.bank });
-      alert("🎉 Вы выиграли стол и забрали банк!"); 
+      alert("🎉 Стол выигран! Вы забрали банк!");
       location.reload();
     }
-    if (rState.status === 'finished') { 
-      clearInterval(multiSyncInterval); 
-      alert("Игра завершена!"); 
-      location.reload(); 
+    if (rState.status === 'finished') {
+      clearInterval(multiSyncInterval);
+      alert("Матч завершен!");
+      location.reload();
     }
   }, 1500);
 }
@@ -375,6 +375,7 @@ document.getElementById('btn-open-global-chat').addEventListener('click', () => 
   document.getElementById('modal-global-chat').classList.remove('hidden');
   updateGlobalChat();
 });
+
 document.getElementById('btn-close-global-chat').addEventListener('click', () => {
   document.getElementById('modal-global-chat').classList.add('hidden');
 });
@@ -383,18 +384,19 @@ document.getElementById('btn-global-chat-send').addEventListener('click', async 
   const input = document.getElementById('global-chat-input');
   if(!input.value.trim()) return;
   await fetch('/api/chat/global/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, text: input.value.trim() }) });
-  input.value = ''; 
+  input.value = '';
   updateGlobalChat();
 });
 
 async function updateGlobalChat() {
   if (document.getElementById('modal-global-chat').classList.contains('hidden')) return;
-  const res = await fetch('/api/chat/global'); 
+  const res = await fetch('/api/chat/global');
   const messages = await res.json();
   const chatBox = document.getElementById('global-chat-messages');
-  chatBox.innerHTML = messages.map(m => "<div><b>" + m.name + "</b>: " + m.text + "</div>").join('');
+  chatBox.innerHTML = messages.map(m => `<div style="margin-bottom:5px;"><b>${m.name}</b>: ${m.text}</div>`).join('');
   chatBox.scrollTop = chatBox.scrollHeight;
 }
+
 setInterval(updateGlobalChat, 2000);
 
 document.getElementById('btn-admin-login').addEventListener('click', () => document.getElementById('modal-admin').classList.remove('hidden'));
@@ -411,30 +413,23 @@ document.getElementById('btn-admin-auth').addEventListener('click', async () => 
 async function refreshAdminPlayers() {
   const res = await fetch('/api/admin/players', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword: currentAdminPassword }) });
   const players = await res.json();
-  document.getElementById('admin-players-list').innerHTML = players.map(p => `
-    <div style="background:rgba(255,255,255,0.1); padding:10px; border-radius:6px; margin-bottom:5px;">
-      <b>\${p.name}</b> \${p.isBanned ? '<span style="color:#e74c3c;">[ЗАБАНЕН]</span>' : ''}<br>
-      Баланс: \${p.bills}💵 | \${p.coins}🪙<br>
-      <button class="btn" style="background:#e74c3c; padding:4px 8px; font-size:12px;" onclick="togglePlayerBan('\${p.uid}', 'ban')">Бан</button>
-      <button class="btn" style="background:#2ecc71; padding:4px 8px; font-size:12px;" onclick="togglePlayerBan('\${p.uid}', 'unban')">Разбан</button>
-    </div>
-  `).join('');
+  document.getElementById('admin-players-list').innerHTML = players.map(p => `<div class="admin-user-profile-card"> <div><b>Игрок:</b> ${p.name} ${p.isBanned ? '<span style="color:#e74c3c; font-weight:bold;">[ЗАБАНЕН]</span>' : ''}</div> <div style="font-size:13px; margin:4px 0;">Счёт: ${p.bills} 💵 | Монеты: ${p.coins} 🪙</div> <div style="margin-top:6px; display:flex; gap:5px;"> <button class="btn-danger-action" style="padding:4px 10px; font-size:12px;" onclick="togglePlayerBan('${p.uid}', 'ban')">Бан</button> <button class="btn-submit" style="padding:4px 10px; font-size:12px; background:#2ecc71;" onclick="togglePlayerBan('${p.uid}', 'unban')">Разбан</button> </div> </div>`).join('');
 }
 
 window.togglePlayerBan = async (targetUid, banAction) => {
   await fetch('/api/admin/ban', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, banAction, reason: "Нарушение правил" })
+    body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, banAction, reason: "Нарушение внутренних правил" })
   });
-  alert(banAction === 'ban' ? "Игрок заблокирован!" : "Игрок разблокирован!");
+  alert(banAction === 'ban' ? "Игрок успешно заблокирован!" : "Игрок разблокирован!");
   refreshAdminPlayers();
 };
 
 document.getElementById('btn-admin-clear-top').addEventListener('click', async () => {
-  if (!confirm("Вы уверены?")) return;
+  if (!confirm("Обнулить счета всех участников до 5000?")) return;
   await fetch('/api/admin/clear-top', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword: currentAdminPassword }) });
-  alert("Лидерборд сброшен!");
+  alert("Таблица сброшена!");
   refreshAdminPlayers();
 });
 
@@ -443,18 +438,15 @@ function showGiftNotifications(gift) {
   const text = document.getElementById('gift-alert-text');
   const icon = document.getElementById('gift-alert-icon');
   const curBox = document.getElementById('gift-currency-show');
-
-  if (user.isBanned || gift.from === "СИСТЕМА БЕЗОПАСНОСТИ") {
+  if (gift.from === "СИСТЕМА БЕЗОПАСНОСТИ") {
     icon.textContent = "🛑";
     title.textContent = "ДОСТУП ОГРАНИЧЕН";
     text.textContent = gift.msg;
     curBox.style.display = "none";
   } else {
     icon.textContent = "🎁";
-    title.textContent = "Подарок от SANI GROUP";
-    text.textContent = gift.msg || "Вам начислен игровой бонус!";
-    document.getElementById('gift-alert-bills').textContent = "+" + gift.bills + " 💵";
-    document.getElementById('gift-alert-coins').textContent = "+" + gift.coins + " 🪙";
+    title.textContent = "Система наград";
+    text.textContent = gift.msg || "Бонус зачислен на игровой аккаунт!";
     curBox.style.display = "flex";
   }
   document.getElementById('modal-gift-alert').classList.remove('hidden');
@@ -462,14 +454,15 @@ function showGiftNotifications(gift) {
 
 document.getElementById('btn-close-gift-alert').onclick = () => {
   document.getElementById('modal-gift-alert').classList.add('hidden');
-  if (!user.isBanned) { saveUser({ pendingGifts: [] }); loadUser(); }
+  if (user && !user.isBanned) { saveUser({ pendingGifts: [] }); loadUser(); }
 };
 
 document.getElementById('btn-play').addEventListener('click', () => openModal('setup'));
-document.getElementById('setup-start').addEventListener('click', () => { 
-  document.getElementById('modal-setup').classList.add('hidden'); 
-  startGame('A', 1); 
+document.getElementById('setup-start').addEventListener('click', () => {
+  document.getElementById('modal-setup').classList.add('hidden');
+  startGame('A', 1);
 });
+
 document.getElementById('btn-exit-game').addEventListener('click', () => location.reload());
 
 loadUser();

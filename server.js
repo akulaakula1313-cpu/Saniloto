@@ -186,31 +186,6 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, list);
   }
 
-  if (pathname === '/api/admin/give-reward' && req.method === 'POST') {
-    const { adminPassword, targetUid, amountBills, amountCoins, adminMessage } = await readBody(req);
-    if (adminPassword !== 'admin123') return sendJSON(res, 403, { error: 'Пароль неверный!' });
-    const db = loadDB();
-    if (!db.users[targetUid]) return sendJSON(res, 404, { error: 'Игрок не найден!' });
-
-    const b = parseInt(amountBills || 0, 10);
-    const c = parseInt(amountCoins || 0, 10);
-
-    db.users[targetUid].bills += b;
-    db.users[targetUid].coins += c;
-
-    if (!db.users[targetUid].pendingGifts) db.users[targetUid].pendingGifts = [];
-    db.users[targetUid].pendingGifts.push({
-      from: "SANI GROUP",
-      bills: b,
-      coins: c,
-      msg: adminMessage || "",
-      time: Date.now()
-    });
-
-    saveDB(db);
-    return sendJSON(res, 200, { ok: true });
-  }
-
   if (pathname === '/api/admin/ban' && req.method === 'POST') {
     const { adminPassword, targetUid, banAction, reason } = await readBody(req);
     if (adminPassword !== 'admin123') return sendJSON(res, 403, { error: 'Пароль неверный!' });
@@ -254,19 +229,6 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { ok: true });
   }
 
-  if (pathname === '/api/chat/room/send' && req.method === 'POST') {
-    const { uid, roomId, text } = await readBody(req);
-    const db = loadDB();
-    const user = db.users[uid];
-    const room = rooms[roomId];
-
-    if (!room || !user || user.isBanned || !text || text.trim() === '') return sendJSON(res, 400, { error: 'Ошибка' });
-    if (!room.chat) room.chat = [];
-
-    room.chat.push({ name: user.name, text: text.trim().substring(0, 150), time: Date.now() });
-    return sendJSON(res, 200, { ok: true });
-  }
-
   let filePath = pathname === '/' ? '/index.html' : pathname;
   const fullPath = path.join(__dirname, filePath);
   fs.readFile(fullPath, (err, data) => {
@@ -277,4 +239,4 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => console.log(`Лото Сервер запущен на http://localhost:\${PORT}`));
+server.listen(PORT, () => console.log(`Лото Сервер запущен на http://localhost:${PORT}`));
