@@ -4,10 +4,15 @@ const path = require('path');
 const crypto = require('crypto');
 const { URL } = require('url');
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
 const DB_FILE = path.join(__dirname, 'db.json');
+const PUBLIC_DIR = __dirname;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ROOM_TTL_MS = 30 * 60 * 1000;
+const PLAYER_TIMEOUT_MS = 12 * 1000;
+const DRAW_INTERVAL_MS = 4000;
 
-const rooms = {}; 
+const rooms = Object.create(null);
 let globalChat = [];
 
 const MIME = {
@@ -24,19 +29,24 @@ function loadDB() {
     return initial;
   }
   try {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+    if (!db.users || typeof db.users !== 'object') db.users = {};
+    if (!Array.isArray(db.leaderboard)) db.leaderboard = [];
+    return db;
   } catch {
     return { users: {}, leaderboard: [] };
   }
 }
 
 function saveDB(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  const tmp = DB_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  fs.renameSync(tmp, DB_FILE);
 }
 
 function defaultUser(name) {
   return {
-    name: name || 'Игрок_' + Math.floor(1000 + Math.random() * 9000),
+    name: String(name || '').trim().slice(0, 24) || 'Игрок_' + Math.floor(1000 + Math.random() * 9000),
     avatar: 0,
     marker: 0,
     unlockedMarkers: [0],
@@ -52,258 +62,399 @@ function defaultUser(name) {
 }
 
 function sendJSON(res, status, data) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(data));
 }
 
+function cleanText(value, max = 500) {
+  return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
+}
+
 async function readBody(req) {
-  return new Promise((resolve) => {
-    let chunks = '';
-    req.on('data', c => chunks += c);
+  return new Promise(resolve => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 200000) req.destroy();
+    });
     req.on('end', () => {
-      try { resolve(JSON.parse(chunks)); } catch { resolve({}); }
+      try { resolve(JSON.parse(body || '{}')); } catch { resolve({}); }
     });
   });
 }
 
+function requireUser(db, uid) {
+  if (!uid || !db.users[uid]) return null;
+  return db.users[uid];
+}
+
+function validateUserUpdate(update) {
+  const out = {};
+  if (typeof update.name === 'string') out.name = cleanText(update.name, 24) || 'Игрок';
+  if (Number.isInteger(update.avatar) && update.avatar >= 0 && update.avatar <= 9) out.avatar = update.avatar;
+  return out;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function generateTicket() {
+  const ranges = Array.from({ length: 9 }, (_, c) => ({ start: c === 0 ? 1 : c * 10, end: c === 8 ? 90 : c * 10 + 9 }));
+  let chosenRows = null;
+  for (let attempt = 0; attempt < 20000 && !chosenRows; attempt++) {
+    const rows = [[], [], []];
+    for (let r = 0; r < 3; r++) rows[r] = shuffle(Array.from({ length: 9 }, (_, i) => i)).slice(0, 5);
+    const counts = Array(9).fill(0);
+    rows.forEach(cols => cols.forEach(c => counts[c]++));
+    if (counts.every(n => n >= 1 && n <= 3)) chosenRows = rows;
+  }
+  if (!chosenRows) return generateTicket();
+
+  const grid = Array.from({ length: 3 }, () => Array(9).fill(null));
+  for (let c = 0; c < 9; c++) {
+    const rows = chosenRows.map((cols, r) => cols.includes(c) ? r : -1).filter(r => r >= 0);
+    const nums = [];
+    for (let n = ranges[c].start; n <= ranges[c].end; n++) nums.push(n);
+    shuffle(nums);
+    nums.splice(rows.length).sort((a, b) => a - b);
+    const selected = nums.slice(0, rows.length).sort((a, b) => a - b);
+    rows.forEach((r, i) => { grid[r][c] = selected[i]; });
+  }
+  return grid;
+}
+
+function ticketNumbers(ticket) {
+  return ticket.flat().filter(n => Number.isInteger(n));
+}
+
+function winByMarks(mode, ticket, markedSet) {
+  if (mode === 'A') return ticketNumbers(ticket).every(n => markedSet.has(n));
+  if (mode === 'B') {
+    return ticket.some(row => {
+      const nums = row.filter(Number.isInteger);
+      return nums.length > 0 && nums.every(n => markedSet.has(n));
+    });
+  }
+  if (mode === 'C') {
+    const nums = ticket[2].filter(Number.isInteger);
+    return nums.length > 0 && nums.every(n => markedSet.has(n));
+  }
+  return false;
+}
+
+function sanitizeRoom(room, uid) {
+  return {
+    id: room.id,
+    stake: room.stake,
+    maxPlayers: room.maxPlayers,
+    mode: room.mode,
+    status: room.status,
+    drawn: room.drawn,
+    bank: room.bank,
+    lastTick: room.lastTick,
+    chat: room.chat.slice(-20),
+    players: room.players.filter(p => p.active).map(p => ({ uid: p.uid, name: p.name, avatar: p.avatar, online: Date.now() - p.lastSeen <= PLAYER_TIMEOUT_MS })),
+    selfTicket: room.players.find(p => p.uid === uid)?.ticket || null,
+    winnerUid: room.winnerUid || null,
+    payout: room.payout || 0
+  };
+}
+
+function refundWaitingRoom(room, db) {
+  for (const p of room.players) {
+    if (p.stakePaid && !p.refunded) {
+      const u = db.users[p.uid];
+      if (u) u.bills += p.contribution;
+      p.refunded = true;
+    }
+  }
+  room.bank = 0;
+}
+
+function refundAllPlayers(room, db) {
+  for (const p of room.players) {
+    if (p.stakePaid && !p.refunded) {
+      const u = db.users[p.uid];
+      if (u) u.bills += p.contribution;
+      p.refunded = true;
+    }
+  }
+  room.bank = 0;
+}
+
+function payoutWinner(room, db, uid) {
+  if (room.paidOut || room.bank <= 0) return 0;
+  const winner = db.users[uid];
+  if (!winner) return 0;
+  const amount = room.bank;
+  winner.bills += amount;
+  room.bank = 0;
+  room.paidOut = true;
+  room.status = 'finished';
+  room.winnerUid = uid;
+  room.payout = amount;
+  saveDB(db);
+  return amount;
+}
+
+function touchPlayer(room, uid) {
+  const p = room.players.find(x => x.uid === uid);
+  if (p) { p.lastSeen = Date.now(); p.active = true; }
+  return p;
+}
+
+function maybeProgressRoom(room) {
+  if (room.status !== 'playing') return;
+  if (Date.now() - room.lastTick < DRAW_INTERVAL_MS) return;
+  if (room.deck.length > 0) {
+    room.drawn.push(room.deck.pop());
+    room.lastTick = Date.now();
+  } else {
+    room.status = 'finished';
+  }
+}
+
+function cleanupRooms() {
+  const now = Date.now();
+  const db = loadDB();
+  for (const [id, room] of Object.entries(rooms)) {
+    for (const p of room.players) {
+      if (p.active && now - p.lastSeen > PLAYER_TIMEOUT_MS) p.active = false;
+    }
+    if (room.status === 'waiting' && room.players.every(p => !p.active)) {
+      refundWaitingRoom(room, db);
+      delete rooms[id];
+      continue;
+    }
+    if (room.status === 'playing' && room.players.every(p => !p.active)) {
+      refundAllPlayers(room, db);
+      room.status = 'cancelled';
+      room.cancelledAt = now;
+    }
+    if ((room.status === 'finished' || room.status === 'cancelled') && now - (room.finishedAt || room.cancelledAt || room.lastTick) > ROOM_TTL_MS) delete rooms[id];
+  }
+  saveDB(db);
+}
+
+setInterval(cleanupRooms, 5000);
+
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const { pathname, searchParams } = url;
+  try {
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const { pathname, searchParams } = url;
 
-  const checkUid = searchParams.get('uid');
-  if (checkUid) {
-    const db = loadDB();
-    if (db.users[checkUid] && db.users[checkUid].isBanned) {
-      return sendJSON(res, 403, { error: 'banned', message: 'Вы заблокированы администратором!' });
-    }
-  }
-
-  if (pathname === '/api/state' && req.method === 'GET') {
-    const db = loadDB();
-    let uid = searchParams.get('uid');
-    if (!uid || !db.users[uid]) {
-      uid = crypto.randomBytes(8).toString('hex');
-      db.users[uid] = defaultUser(searchParams.get('name'));
-      saveDB(db);
-    }
-    return sendJSON(res, 200, { uid, ...db.users[uid] });
-  }
-
-  if (pathname === '/api/state' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { uid, ...update } = body;
-    const db = loadDB();
-    if (!uid || !db.users[uid]) return sendJSON(res, 400, { error: 'bad_uid' });
-    if (db.users[uid].isBanned) return sendJSON(res, 403, { error: 'banned' });
-    db.users[uid] = { ...db.users[uid], ...update };
-    saveDB(db);
-    return sendJSON(res, 200, { ok: true, user: db.users[uid] });
-  }
-
-  if (pathname === '/api/dailyreward/claim' && req.method === 'POST') {
-    const { uid } = await readBody(req);
-    const db = loadDB();
-    const user = db.users[uid];
-    if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
-    const now = Date.now();
-    if (now - user.lastClaim < 24 * 60 * 60 * 1000) {
-      return sendJSON(res, 400, { error: 'Награда уже получена сегодня' });
-    }
-    const rewards = [
-      { bills: 500, coins: 0 }, { bills: 1000, coins: 0 }, { bills: 0, coins: 10 },
-      { bills: 1500, coins: 0 }, { bills: 0, coins: 30 }, { bills: 3000, coins: 0 }, { bills: 0, coins: 45 }
-    ];
-    const day = user.dailyStreak % 7;
-    const reward = rewards[day];
-    user.bills += reward.bills;
-    user.coins += reward.coins;
-    user.dailyStreak += 1;
-    user.lastClaim = now;
-    saveDB(db);
-    return sendJSON(res, 200, { ok: true, user });
-  }
-
-  if (pathname === '/api/leaderboard' && req.method === 'GET') {
-    const db = loadDB();
-    const list = Object.values(db.users).map(u => ({ name: u.name, score: u.bills }));
-    list.sort((a, b) => b.score - a.score);
-    return sendJSON(res, 200, list.slice(0, 50));
-  }
-
-  if (pathname === '/api/room/create' && req.method === 'POST') {
-    const { uid, maxPlayers, stake, mode } = await readBody(req);
-    const db = loadDB();
-    const user = db.users[uid];
-    if (!user || user.bills < stake) return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
-
-    let roomId; do { roomId = Math.floor(1000 + Math.random() * 9000).toString(); } while (rooms[roomId]);
-    user.bills -= stake; saveDB(db);
-
-    rooms[roomId] = {
-      id: roomId,
-      stake: parseInt(stake, 10),
-      maxPlayers: parseInt(maxPlayers, 10),
-      mode: mode || 'A',
-      players: [{ uid, name: user.name, avatar: user.avatar }],
-      status: 'waiting',
-      deck: Array.from({ length: 90 }, (_, i) => i + 1).sort(() => Math.random() - 0.5),
-      drawn: [],
-      bank: parseInt(stake, 10),
-      lastTick: Date.now(),
-      chat: []
-    };
-    return sendJSON(res, 200, { ok: true, roomId, room: rooms[roomId], userBalance: user.bills });
-  }
-
-  if (pathname === '/api/room/join' && req.method === 'POST') {
-    const { uid, roomId } = await readBody(req);
-    const db = loadDB(); const user = db.users[uid]; const room = rooms[roomId];
-    if (!room) return sendJSON(res, 404, { error: 'Стол не найден!' });
-    if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра уже началась!' });
-    if (room.players.length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол заполнен!' });
-    if (room.players.some(p => p.uid === uid)) return sendJSON(res, 200, { ok: true, room });
-    if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно денег!' });
-
-    user.bills -= room.stake; room.bank += room.stake; saveDB(db);
-    room.players.push({ uid, name: user.name, avatar: user.avatar });
-    if (room.players.length === room.maxPlayers) room.status = 'playing';
-    return sendJSON(res, 200, { ok: true, room, userBalance: user.bills });
-  }
-
-  if (pathname === '/api/room/sync' && req.method === 'GET') {
-    const roomId = searchParams.get('roomId'); const room = rooms[roomId];
-    if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
-    if (room.status === 'playing' && Date.now() - room.lastTick >= 4000) {
-      if (room.deck.length > 0) {
-        const nextNum = room.deck.pop();
-        room.drawn.push(nextNum);
-        room.lastTick = Date.now();
-      } else {
-        room.status = 'finished';
+    if (pathname.startsWith('/api/')) {
+      const uid = searchParams.get('uid');
+      if (uid) {
+        const db = loadDB();
+        if (db.users[uid]?.isBanned) return sendJSON(res, 403, { error: 'banned', message: 'Вы заблокированы администратором!' });
       }
     }
-    return sendJSON(res, 200, room);
-  }
 
-  if (pathname === '/api/chat/room/send' && req.method === 'POST') {
-    const { uid, roomId, text } = await readBody(req);
-    const db = loadDB();
-    const room = rooms[roomId];
-    if (room && db.users[uid]) {
-      room.chat.push({ name: db.users[uid].name, text });
-      if (room.chat.length > 20) room.chat.shift();
-      return sendJSON(res, 200, { ok: true });
+    if (pathname === '/api/state' && req.method === 'GET') {
+      const db = loadDB();
+      let uid = searchParams.get('uid');
+      if (!uid || !db.users[uid]) {
+        uid = crypto.randomBytes(8).toString('hex');
+        db.users[uid] = defaultUser(searchParams.get('name'));
+        saveDB(db);
+      }
+      return sendJSON(res, 200, { uid, ...db.users[uid] });
     }
-    return sendJSON(res, 400, { error: 'Комната или пользователь не найдены' });
-  }
 
-  if (pathname === '/api/chat/global' && req.method === 'GET') {
-    return sendJSON(res, 200, globalChat);
-  }
-
-  if (pathname === '/api/chat/global/send' && req.method === 'POST') {
-    const { uid, text } = await readBody(req);
-    const db = loadDB();
-    if(db.users[uid]) {
-      globalChat.push({ name: db.users[uid].name, text });
-      if(globalChat.length > 30) globalChat.shift();
+    if (pathname === '/api/state' && req.method === 'POST') {
+      const body = await readBody(req);
+      const db = loadDB();
+      const user = requireUser(db, body.uid);
+      if (!user) return sendJSON(res, 400, { error: 'bad_uid' });
+      if (user.isBanned) return sendJSON(res, 403, { error: 'banned' });
+      const patch = validateUserUpdate(body);
+      Object.assign(user, patch);
+      saveDB(db);
+      return sendJSON(res, 200, { ok: true, user });
     }
-    return sendJSON(res, 200, { ok: true });
-  }
 
-  if (pathname === '/api/admin/players' && req.method === 'POST') {
-    const { adminPassword } = await readBody(req);
-    if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) return sendJSON(res, 401, { error: 'Wrong password' });
-    const db = loadDB();
-    return sendJSON(res, 200, Object.entries(db.users).map(([k, v]) => ({ uid: k, ...v })));
-  }
-
-  // Админские действия: отдельные деньги, монеты, VIP, бан и SMS.
-  if (pathname === '/api/admin/clear-database' && req.method === 'POST') {
-    const { adminPassword } = await readBody(req);
-    if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
-      return sendJSON(res, 401, { error: 'Wrong password' });
+    if (pathname === '/api/dailyreward/claim' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
+      const now = Date.now();
+      if (now - Number(user.lastClaim || 0) < 24 * 60 * 60 * 1000) return sendJSON(res, 400, { error: 'Награда уже получена сегодня' });
+      const rewards = [{ bills: 500 }, { bills: 1000 }, { coins: 10 }, { bills: 1500 }, { coins: 30 }, { bills: 3000 }, { coins: 45 }];
+      const day = Number(user.dailyStreak || 0) % rewards.length;
+      const reward = rewards[day];
+      user.bills += reward.bills || 0; user.coins += reward.coins || 0;
+      user.dailyStreak = Number(user.dailyStreak || 0) + 1; user.lastClaim = now;
+      saveDB(db);
+      return sendJSON(res, 200, { ok: true, reward, user });
     }
-    const emptyDB = { users: {}, leaderboard: [] };
-    saveDB(emptyDB);
-    for (const key of Object.keys(rooms)) delete rooms[key];
-    globalChat = [];
-    return sendJSON(res, 200, { ok: true, message: 'База игроков полностью очищена' });
-  }
 
-  if (pathname === '/api/admin/action' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { adminPassword, action, uid, amount, message } = body;
-    if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
-      return sendJSON(res, 401, { error: 'Wrong password' });
+    if (pathname === '/api/shop/buy' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      const bills = Number.parseInt(body.bills, 10); const coins = Number.parseInt(body.coins, 10);
+      if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
+      if (!Number.isInteger(bills) || !Number.isInteger(coins) || bills <= 0 || coins <= 0 || bills > 1000000 || coins > 100000) return sendJSON(res, 400, { error: 'Некорректный товар' });
+      if (user.bills < bills) return sendJSON(res, 400, { error: 'Недостаточно денег' });
+      user.bills -= bills; user.coins += coins; saveDB(db);
+      return sendJSON(res, 200, { ok: true, user });
     }
-    const db = loadDB();
-    const target = db.users[uid];
-    if (!target) return sendJSON(res, 404, { error: 'Игрок не найден' });
-    if (!Array.isArray(target.pendingGifts)) target.pendingGifts = [];
 
-    const num = Math.max(0, Math.floor(Number(amount) || 0));
-    const pushNotice = (type, text, extra = {}) => {
-      target.pendingGifts.push({ type, message: text || '', createdAt: Date.now(), ...extra });
-      if (target.pendingGifts.length > 30) target.pendingGifts = target.pendingGifts.slice(-30);
-    };
-
-    if (action === 'ban') {
-      target.isBanned = true;
-      pushNotice('system', 'Ваш аккаунт заблокирован администратором.');
-    } else if (action === 'unban') {
-      target.isBanned = false;
-      pushNotice('system', 'Ваш аккаунт разблокирован. Добро пожаловать обратно!');
-    } else if (action === 'vip_on') {
-      target.isVip = true;
-      pushNotice('vip', 'Администратор SANI GROUP подарил вам VIP-статус! 👑');
-    } else if (action === 'vip_off') {
-      target.isVip = false;
-      pushNotice('vip', 'VIP-статус отключён администратором SANI GROUP.');
-    } else if (action === 'give_bills') {
-      if (!num) return sendJSON(res, 400, { error: 'Укажите количество денег' });
-      target.bills = Math.max(0, (target.bills || 0) + num);
-      pushNotice('bills', `Вам начислено ${num} 💵`, { bills: num, coins: 0 });
-    } else if (action === 'give_coins') {
-      if (!num) return sendJSON(res, 400, { error: 'Укажите количество монет' });
-      target.coins = Math.max(0, (target.coins || 0) + num);
-      pushNotice('coins', `Вам начислено ${num} 🪙`, { bills: 0, coins: num });
-    } else if (action === 'message') {
-      const text = String(message || '').trim().slice(0, 500);
-      if (!text) return sendJSON(res, 400, { error: 'Введите сообщение' });
-      pushNotice('message', text);
-    } else return sendJSON(res, 400, { error: 'Неизвестное действие' });
-
-    saveDB(db);
-    return sendJSON(res, 200, { ok: true, user: { uid, ...target } });
-  }
-
-  const fileMap = {
-    '/': 'index.html',
-    '/index.html': 'index.html',
-    '/style.css': 'style.css',
-    '/client.js': 'client.js'
-  };
-  const targetFile = fileMap[pathname];
-  if (targetFile) {
-    // Поддерживаем оба варианта структуры проекта:
-    // файлы в корне (как в GitHub-репозитории) и старую папку generated/.
-    const candidates = [
-      path.join(__dirname, targetFile),
-      path.join(__dirname, 'generated', targetFile)
-    ];
-    const fPath = candidates.find(p => fs.existsSync(p));
-    if (fPath) {
-      const ext = path.extname(fPath);
-      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
-      return res.end(fs.readFileSync(fPath));
+    if (pathname === '/api/marker/buy' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      const markerId = Number.parseInt(body.markerId, 10); const costs = { 0: 0, 1: 15000, 2: 15000, 3: 15000 }; const cost = costs[markerId];
+      if (!user || cost === undefined) return sendJSON(res, 400, { error: 'Некорректный маркер' });
+      user.unlockedMarkers = Array.isArray(user.unlockedMarkers) ? user.unlockedMarkers : [0];
+      if (user.unlockedMarkers.includes(markerId)) { user.marker = markerId; saveDB(db); return sendJSON(res, 200, { ok: true, user }); }
+      if (user.bills < cost) return sendJSON(res, 400, { error: 'Недостаточно денег' });
+      user.bills -= cost; user.unlockedMarkers.push(markerId); user.marker = markerId; saveDB(db);
+      return sendJSON(res, 200, { ok: true, user });
     }
-  }
 
-  res.writeHead(404, { 'Content-Type': 'text/plain' });
-  res.end('Not Found');
+    if (pathname === '/api/notifications/clear' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
+      user.pendingGifts = []; saveDB(db); return sendJSON(res, 200, { ok: true, user });
+    }
+
+    if (pathname === '/api/leaderboard' && req.method === 'GET') {
+      const db = loadDB();
+      const list = Object.entries(db.users).map(([uid, u]) => ({ uid, name: u.name, avatar: u.avatar, isVip: !!u.isVip, score: Number(u.bills || 0) }));
+      list.sort((a, b) => b.score - a.score);
+      return sendJSON(res, 200, list.slice(0, 50));
+    }
+
+    if (pathname === '/api/room/create' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      const maxPlayers = Math.max(2, Math.min(6, Number.parseInt(body.maxPlayers, 10) || 2));
+      const stake = Number.parseInt(body.stake, 10);
+      const mode = ['A', 'B', 'C'].includes(body.mode) ? body.mode : 'A';
+      if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
+      if (!Number.isInteger(stake) || stake < 1 || stake > 1000000) return sendJSON(res, 400, { error: 'Некорректная ставка' });
+      if (user.bills < stake) return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
+      if (Object.values(rooms).some(r => r.players.some(p => p.uid === body.uid) && ['waiting', 'playing'].includes(r.status))) return sendJSON(res, 400, { error: 'Вы уже за другим столом' });
+      let roomId; do roomId = String(crypto.randomInt(1000, 10000)); while (rooms[roomId]);
+      user.bills -= stake;
+      const player = { uid: body.uid, name: user.name, avatar: user.avatar, ticket: generateTicket(), contribution: stake, stakePaid: true, refunded: false, active: true, lastSeen: Date.now() };
+      rooms[roomId] = { id: roomId, stake, maxPlayers, mode, players: [player], status: 'waiting', deck: shuffle(Array.from({ length: 90 }, (_, i) => i + 1)), drawn: [], bank: stake, lastTick: Date.now(), chat: [], createdAt: Date.now(), paidOut: false };
+      saveDB(db);
+      return sendJSON(res, 200, { ok: true, roomId, room: sanitizeRoom(rooms[roomId], body.uid), userBalance: user.bills });
+    }
+
+    if (pathname === '/api/room/join' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid); const room = rooms[String(body.roomId || '')];
+      if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
+      if (!room) return sendJSON(res, 404, { error: 'Стол не найден!' });
+      if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра уже началась!' });
+      if (room.players.some(p => p.uid === body.uid && p.active)) return sendJSON(res, 200, { ok: true, room: sanitizeRoom(room, body.uid), userBalance: user.bills });
+      if (room.players.filter(p => p.active).length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол заполнен!' });
+      if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно денег!' });
+      user.bills -= room.stake;
+      room.bank += room.stake;
+      room.players.push({ uid: body.uid, name: user.name, avatar: user.avatar, ticket: generateTicket(), contribution: room.stake, stakePaid: true, refunded: false, active: true, lastSeen: Date.now() });
+      if (room.players.filter(p => p.active).length >= room.maxPlayers) { room.status = 'playing'; room.lastTick = Date.now(); }
+      saveDB(db);
+      return sendJSON(res, 200, { ok: true, room: sanitizeRoom(room, body.uid), userBalance: user.bills });
+    }
+
+    if (pathname === '/api/room/heartbeat' && req.method === 'POST') {
+      const body = await readBody(req); const room = rooms[String(body.roomId || '')];
+      if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
+      if (!touchPlayer(room, body.uid)) return sendJSON(res, 400, { error: 'Игрок не за столом' });
+      maybeProgressRoom(room);
+      return sendJSON(res, 200, { ok: true, room: sanitizeRoom(room, body.uid) });
+    }
+
+    if (pathname === '/api/room/leave' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const room = rooms[String(body.roomId || '')];
+      if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
+      const player = room.players.find(p => p.uid === body.uid);
+      if (!player) return sendJSON(res, 200, { ok: true });
+      player.active = false; player.lastSeen = Date.now();
+      if (room.status === 'waiting') {
+        if (!player.refunded) { db.users[player.uid].bills += player.contribution; player.refunded = true; room.bank -= player.contribution; }
+        room.players = room.players.filter(p => p.active);
+        if (room.players.length === 0) delete rooms[room.id];
+      } else if (room.status === 'playing' && room.players.every(p => !p.active)) {
+        refundAllPlayers(room, db); room.status = 'cancelled'; room.cancelledAt = Date.now();
+      }
+      saveDB(db);
+      return sendJSON(res, 200, { ok: true, userBalance: db.users[player.uid]?.bills ?? 0 });
+    }
+
+    if (pathname === '/api/room/sync' && req.method === 'GET') {
+      const room = rooms[String(searchParams.get('roomId') || '')];
+      const uid = searchParams.get('uid');
+      if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
+      touchPlayer(room, uid); maybeProgressRoom(room);
+      if (room.deck.length === 0 && room.status === 'playing') { room.status = 'finished'; room.finishedAt = Date.now(); }
+      return sendJSON(res, 200, sanitizeRoom(room, uid));
+    }
+
+    if (pathname === '/api/room/win' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const room = rooms[String(body.roomId || '')];
+      if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
+      if (room.status !== 'playing') return sendJSON(res, 400, { error: 'Игра уже завершена' });
+      const player = room.players.find(p => p.uid === body.uid && p.active);
+      if (!player) return sendJSON(res, 400, { error: 'Игрок не активен' });
+      const marked = new Set(Array.isArray(body.marked) ? body.marked.filter(Number.isInteger) : []);
+      const drawn = new Set(room.drawn);
+      for (const n of marked) if (!drawn.has(n)) return sendJSON(res, 400, { error: 'Нельзя отметить не выпавший номер' });
+      if (!winByMarks(room.mode, player.ticket, marked)) return sendJSON(res, 400, { error: 'Условие победы ещё не выполнено' });
+      const payout = payoutWinner(room, db, player.uid);
+      return sendJSON(res, 200, { ok: true, winnerUid: player.uid, payout, userBalance: db.users[player.uid].bills, room: sanitizeRoom(room, body.uid) });
+    }
+
+    if (pathname === '/api/chat/room/send' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const room = rooms[String(body.roomId || '')]; const user = requireUser(db, body.uid);
+      if (!room || !user || !room.players.some(p => p.uid === body.uid && p.active)) return sendJSON(res, 400, { error: 'Комната или пользователь не найдены' });
+      const text = cleanText(body.text, 300); if (!text) return sendJSON(res, 400, { error: 'Пустое сообщение' });
+      room.chat.push({ uid: body.uid, name: user.name, text, at: Date.now() }); if (room.chat.length > 20) room.chat.shift();
+      touchPlayer(room, body.uid); return sendJSON(res, 200, { ok: true });
+    }
+
+    if (pathname === '/api/chat/global' && req.method === 'GET') return sendJSON(res, 200, globalChat.slice(-30));
+    if (pathname === '/api/chat/global/send' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid); if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
+      const text = cleanText(body.text, 300); if (!text) return sendJSON(res, 400, { error: 'Пустое сообщение' });
+      globalChat.push({ uid: body.uid, name: user.name, text, at: Date.now() }); if (globalChat.length > 30) globalChat.shift(); return sendJSON(res, 200, { ok: true });
+    }
+
+    if (pathname === '/api/admin/players' && req.method === 'POST') {
+      const body = await readBody(req); if (body.adminPassword !== ADMIN_PASSWORD) return sendJSON(res, 401, { error: 'Wrong password' });
+      const db = loadDB(); return sendJSON(res, 200, Object.entries(db.users).map(([uid, v]) => ({ uid, ...v })));
+    }
+
+    if (pathname === '/api/admin/action' && req.method === 'POST') {
+      const body = await readBody(req); if (body.adminPassword !== ADMIN_PASSWORD) return sendJSON(res, 401, { error: 'Wrong password' });
+      const db = loadDB(); const user = db.users[body.uid]; const action = String(body.action || '');
+      if (!user && action !== 'clear_database') return sendJSON(res, 404, { error: 'Игрок не найден' });
+      if (action === 'clear_database') {
+        for (const room of Object.values(rooms)) { room.status = 'cancelled'; refundAllPlayers(room, db); }
+        db.users = {}; db.leaderboard = []; globalChat = []; for (const k of Object.keys(rooms)) delete rooms[k]; saveDB(db); return sendJSON(res, 200, { ok: true, cleared: true });
+      }
+      if (action === 'ban') user.isBanned = true;
+      else if (action === 'unban') user.isBanned = false;
+      else if (action === 'money') { const amount = Number.parseInt(body.amount, 10); if (!Number.isInteger(amount) || amount <= 0) return sendJSON(res, 400, { error: 'Некорректная сумма' }); user.bills += amount; user.pendingGifts.push({ type: 'money', bills: amount, coins: 0, message: '', at: Date.now() }); }
+      else if (action === 'coins') { const amount = Number.parseInt(body.amount, 10); if (!Number.isInteger(amount) || amount <= 0) return sendJSON(res, 400, { error: 'Некорректная сумма' }); user.coins += amount; user.pendingGifts.push({ type: 'coins', bills: 0, coins: amount, message: '', at: Date.now() }); }
+      else if (action === 'vip') { user.isVip = Boolean(body.enabled); user.pendingGifts.push({ type: 'vip', bills: 0, coins: 0, message: body.enabled ? 'Вам подарен VIP-статус SANI GROUP 👑' : 'VIP-статус отключён администратором SANI GROUP', at: Date.now() }); }
+      else if (action === 'message') { const text = cleanText(body.message, 500); if (!text) return sendJSON(res, 400, { error: 'Пустое сообщение' }); user.pendingGifts.push({ type: 'message', bills: 0, coins: 0, message: text, at: Date.now() }); }
+      else return sendJSON(res, 400, { error: 'Неизвестное действие' });
+      if (user.pendingGifts.length > 50) user.pendingGifts = user.pendingGifts.slice(-50); saveDB(db); return sendJSON(res, 200, { ok: true, user: { uid: body.uid, ...user } });
+    }
+
+    const fileMap = { '/': 'index.html', '/index.html': 'index.html', '/style.css': 'style.css', '/client.js': 'client.js' };
+    if (fileMap[pathname]) {
+      const filePath = path.join(PUBLIC_DIR, fileMap[pathname]);
+      if (fs.existsSync(filePath)) { res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain; charset=utf-8' }); return res.end(fs.readFileSync(filePath)); }
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Not Found');
+  } catch (err) {
+    console.error(err); if (!res.headersSent) sendJSON(res, 500, { error: 'Ошибка сервера' });
+  }
 });
 
-server.listen(PORT, () => {
-  console.log(`Сервер работает на порту ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Сервер работает на порту ${PORT}`));

@@ -89,7 +89,7 @@
 
     <!-- МОДАЛКА: ЛИДЕРБОРД -->
     <div id="modal-leaderboard" class="modal hidden">
-      <div class="modal-box leaderboard-modal-box">
+      <div class="modal-box">
         <button class="icon-close-modal" data-close="leaderboard">✖</button>
         <h2>🏆 Топ 50 игроков</h2>
         <div class="leaderboard-list" id="leaderboard-list"></div>
@@ -116,7 +116,7 @@
 
     <!-- МОДАЛКА: НАСТРОЙКА ИГРЫ -->
     <div id="modal-setup" class="modal hidden">
-      <div class="modal-box setup-modal-box">
+      <div class="modal-box">
         <button class="icon-close-modal" data-close="setup">✖</button>
         <h2>Настройка игры</h2>
         <h3>Режим игры</h3>
@@ -131,20 +131,20 @@
 
     <!-- МОДАЛКА: СТОЛ ДРУЗЕЙ -->
     <div id="modal-multiplayer" class="modal hidden">
-      <div class="modal-box multiplayer-modal-box">
+      <div class="modal-box">
         <button class="icon-close-modal" id="btn-close-multiplayer">✖</button>
         <h2>👥 Стол Лото с Друзьями</h2>
         
         <div id="multi-create-block">
           <h3>Создать новый стол:</h3>
-          <label class="multi-field">Мест за столом (2-6)<input type="number" id="multi-max-players" value="2" min="2" max="6"></label>
-          <label class="multi-field">Ставка стола (💵)<input type="number" id="multi-stake" value="300" min="1"></label>
+          <label>Мест за столом (2-6): <input type="number" id="multi-max-players" value="2" min="2" max="6" style="width:50px; color:#000;"></label><br><br>
+          <label>Ставка стола (💵): <input type="number" id="multi-stake" value="300" style="width:80px; color:#000;"></label><br><br>
           <button class="btn" id="btn-multi-create">Получить номер стола</button>
         </div>
         <hr>
         <div id="multi-join-block">
           <h3>Подключиться к другу:</h3>
-          <input class="multi-room-code" type="text" id="multi-room-id" placeholder="Код стола">
+          <input type="text" id="multi-room-id" placeholder="Код стола" style="padding:5px; text-align:center; color:#000;"><br><br>
           <button class="btn" id="btn-multi-join">Войти за стол</button>
         </div>
 
@@ -208,47 +208,17 @@
 
     <!-- МОДАЛКА: АДМИНКА -->
     <div id="modal-admin" class="modal hidden">
-      <div class="modal-box admin-modal-box">
+      <div class="modal-box">
         <button class="icon-close-modal" id="btn-close-admin">✖</button>
-        <div class="admin-crown">👑</div>
-        <h2 class="admin-title">Панель Администратора</h2>
-        <div class="admin-subtitle">SANI GROUP • управление игроками</div>
-        <div id="admin-auth-block" class="admin-auth">
-          <div class="admin-lock">🔐</div>
-          <p>Введите пароль администратора</p>
-          <input type="password" id="admin-password-input" placeholder="Пароль" autocomplete="current-password">
-          <button class="btn admin-login-btn" id="btn-admin-auth">ВОЙТИ В АДМИНКУ</button>
+        <h2>👑 Панель Администратора SANI GROUP</h2>
+        <div id="admin-auth-block">
+          <input type="password" id="admin-password-input" placeholder="Пароль" style="padding:5px; text-align:center; color:#000;"><br><br>
+          <button class="btn" id="btn-admin-auth">Войти</button>
         </div>
-        <div id="admin-panel-block" class="hidden admin-panel">
-          <div class="admin-toolbar">
-            <div class="admin-toolbar-title">Игроки</div>
-            <div class="admin-toolbar-actions">
-              <button class="admin-refresh" id="admin-refresh">↻ Обновить</button>
-              <button class="admin-danger-btn" id="admin-clear-database">🗑 ОЧИСТИТЬ БАЗУ</button>
-            </div>
-          </div>
-          <div class="admin-danger-note">⚠️ Полностью удаляет всех игроков, их балансы, VIP, сообщения и активные столы.</div>
+        <div id="admin-panel-block" class="hidden" style="max-height:420px; overflow-y:auto; margin-top:15px;">
+          <button class="btn" id="admin-clear-db" style="background:#a61f1f; margin-bottom:15px;">🗑 ОЧИСТИТЬ ВСЮ БАЗУ</button>
           <div id="admin-players-list"></div>
         </div>
-      </div>
-    </div>
-
-    <!-- МОДАЛКА: ДЕЙСТВИЕ АДМИНА -->
-    <div id="modal-admin-action" class="modal hidden">
-      <div class="modal-box admin-action-modal">
-        <button class="icon-close-modal" id="btn-close-admin-action">✖</button>
-        <div class="admin-action-icon" id="admin-action-icon">💵</div>
-        <h2 id="admin-action-title">Начисление</h2>
-        <p id="admin-action-player" class="admin-action-player"></p>
-        <div id="admin-action-amount-wrap">
-          <label class="admin-field-label" id="admin-action-label">Количество</label>
-          <input type="number" id="admin-action-amount" min="1" step="1" placeholder="1000">
-        </div>
-        <div id="admin-action-message-wrap" class="hidden">
-          <label class="admin-field-label">Текст сообщения</label>
-          <textarea id="admin-action-message" maxlength="500" placeholder="Введите сообщение игроку..."></textarea>
-        </div>
-        <button class="btn admin-confirm" id="btn-admin-action-confirm">ПОДТВЕРДИТЬ</button>
       </div>
     </div>
 
