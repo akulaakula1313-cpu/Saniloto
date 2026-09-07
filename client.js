@@ -27,6 +27,17 @@ let multiSyncInterval = null;
 let currentAdminPassword = "";
 let soundOn = true;
 
+function speakDrumNumber(n) {
+  if (!soundOn || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  let text = n.toString();
+  if (NICKNAMES[n]) text = NICKNAMES[n];
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'ru-RU';
+  utterance.rate = 1.1;
+  window.speechSynthesis.speak(utterance);
+}
+
 function playNotificationSound() {
   if (!soundOn) return;
   try {
@@ -222,21 +233,33 @@ function renderProfile() {
 
 function generateTicket() {
   const ranges = [];
-  for (let c = 0; c < 9; c++) ranges.push({ start: c === 0 ? 1 : c * 10, end: c === 8 ? 90 : c * 10 + 9 });
+  for (let c = 0; c < 9; c++) {
+    ranges.push({ start: c === 0 ? 1 : c * 10, end: c === 8 ? 90 : c * 10 + 9 });
+  }
+  
+  const rowCap = [5, 5, 5];
   const counts = new Array(9).fill(1);
   let remaining = 15 - 9;
-  while (remaining > 0) { const idx = Math.floor(Math.random() * 9); if (counts[idx] < 3) { counts[idx]++; remaining--; } }
-  const rowCap = [5, 5, 5]; 
+  
+  while (remaining > 0) { 
+    const idx = Math.floor(Math.random() * 9); 
+    if (counts[idx] < 3) { counts[idx]++; remaining--; } 
+  }
+  
   const colRows = [];
   for (let c = 0; c < 9; c++) {
     let avail = [0, 1, 2].filter(r => rowCap[r] > 0).sort(() => Math.random() - 0.5);
     const chosen = avail.slice(0, Math.min(counts[c], avail.length));
-    chosen.forEach(r => rowCap[r]--); colRows.push(chosen);
+    chosen.forEach(r => rowCap[r]--); 
+    colRows.push(chosen);
   }
+  
   if (colRows.reduce((s, a) => s + a.length, 0) !== 15) return generateTicket();
+  
   const grid = [new Array(9).fill(null), new Array(9).fill(null), new Array(9).fill(null)];
   for (let c = 0; c < 9; c++) {
-    const pool = []; for (let n = ranges[c].start; n <= ranges[c].end; n++) pool.push(n);
+    const pool = []; 
+    for (let n = ranges[c].start; n <= ranges[c].end; n++) pool.push(n);
     const nums = pool.sort(() => Math.random() - 0.5).slice(0, counts[c]).sort((a, b) => a - b);
     colRows[c].sort((a, b) => a - b).forEach((r, i) => { grid[r][c] = nums[i]; });
   }
@@ -245,6 +268,49 @@ function generateTicket() {
 
 let gameState = null;
 
+function checkWinCondition(mode, tickets, marks) {
+  if (mode === 'A') {
+    return tickets.some((t, ti) => {
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (t[r][c] !== null && !marks[ti][r][c]) return false;
+        }
+      }
+      return true;
+    });
+  }
+  if (mode === 'B') {
+    for (let ti = 0; ti < tickets.length; ti++) {
+      for (let r = 0; r < 3; r++) {
+        let rowWin = true;
+        for (let c = 0; c < 9; c++) {
+          if (tickets[ti][r][c] !== null && !marks[ti][r][c]) { rowWin = false; break; }
+        }
+        if (rowWin) return true;
+      }
+    }
+    return false;
+  }
+  if (mode === 'C') {
+    for (let ti = 0; ti < tickets.length; ti++) {
+      let bottomRowWin = true;
+      for (let c = 0; c < 9; c++) {
+        if (tickets[ti][2][c] !== null && !marks[ti][2][c]) { bottomRowWin = false; break; }
+      }
+      if (bottomRowWin) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+function triggerWinEffects(msg) {
+  if (typeof confetti === 'function') {
+    confetti({ particleCount: 150, spread: 85, origin: { y: 0.6 } });
+  }
+  setTimeout(() => { alert(msg); }, 500);
+}
+
 function startGame(mode, numCards) {
   document.getElementById('screen-menu').classList.remove('active');
   document.getElementById('screen-game').classList.add('active');
@@ -252,22 +318,36 @@ function startGame(mode, numCards) {
   renderGameCurrency();
   document.getElementById('game-player-avatar').textContent = AVATARS[user.avatar];
   document.getElementById('game-player-name').textContent = user.name;
+  
   const tickets = []; const marks = [];
-  for (let i = 0; i < numCards; i++) { 
-    tickets.push(generateTicket()); 
-    marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false))); 
+  for (let i = 0; i < numCards; i++) {
+    tickets.push(generateTicket());
+    marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false)));
   }
+  
   gameState = { mode, tickets, marks, bots: [], drawn: [], currentNumber: null, finished: false, timer: null };
   renderTickets();
+  
   gameState.timer = setInterval(() => {
     if (gameState.drawn.length >= 90) return clearInterval(gameState.timer);
     let n; do { n = Math.floor(1 + Math.random() * 90); } while (gameState.drawn.includes(n));
     gameState.drawn.push(n); gameState.currentNumber = n;
-    document.getElementById('drum-number').textContent = n;
-    document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `"${NICKNAMES[n]}"` : '';
+    
+    const drumEl = document.getElementById('drum-number');
+    drumEl.textContent = n;
+    drumEl.style.animation = 'none';
+    drumEl.offsetHeight;
+    drumEl.style.animation = 'popDrum 0.4s ease-out';
+    document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `${NICKNAMES[n]}` : '';
+    speakDrumNumber(n);
     renderTickets();
-    if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) {
-      clearInterval(gameState.timer); alert("Вы победили!");
+    
+    if (checkWinCondition(gameState.mode, gameState.tickets, gameState.marks)) {
+      clearInterval(gameState.timer);
+      let winText = "Вы победили!";
+      if(gameState.mode === 'B') winText = "🎉 Короткое Лото! Вы первыми закрыли строчку!";
+      if(gameState.mode === 'C') winText = "🎉 Три на Три! Закрыта нижняя строчка карточки!";
+      triggerWinEffects(winText);
     }
   }, DRAW_INTERVAL);
 }
@@ -284,7 +364,13 @@ function renderTickets() {
         if (val === null) td.className = 'empty';
         else {
           td.textContent = val;
-          if (gameState.marks[ti][ri][ci]) { td.classList.add('marked'); td.style.background = markerColor; }
+          if (gameState.drawn.includes(val) && user.isVip) {
+            gameState.marks[ti][ri][ci] = true;
+          }
+          if (gameState.marks[ti][ri][ci]) { 
+            td.classList.add('marked'); 
+            td.style.background = markerColor; 
+          }
           else if (gameState.drawn.includes(val)) td.classList.add('drawn-not-marked');
           td.addEventListener('click', () => {
             if (!gameState.drawn.includes(val) || gameState.marks[ti][ri][ci]) return;
@@ -299,11 +385,6 @@ function renderTickets() {
   });
 }
 
-function ticketFullyMarked(t, m) {
-  for(let r=0; r<3; r++) { for(let c=0; c<9; c++) { if (t[r][c] !== null && !m[r][c]) return false; } }
-  return true;
-}
-
 document.getElementById('btn-open-multiplayer').addEventListener('click', () => {
   document.getElementById('modal-multiplayer').classList.remove('hidden');
   document.getElementById('multi-create-block').classList.remove('hidden');
@@ -314,6 +395,7 @@ document.getElementById('btn-close-multiplayer').addEventListener('click', () =>
   document.getElementById('modal-multiplayer').classList.add('hidden');
   if (multiSyncInterval) clearInterval(multiSyncInterval);
 });
+
 document.getElementById('btn-multi-create').addEventListener('click', async () => {
   const maxPlayers = document.getElementById('multi-max-players').value;
   const stake = document.getElementById('multi-stake').value;
@@ -323,6 +405,7 @@ document.getElementById('btn-multi-create').addEventListener('click', async () =
   user.bills = data.userBalance; renderMenu();
   startWaiting(data.roomId);
 });
+
 document.getElementById('btn-multi-join').addEventListener('click', async () => {
   const roomId = document.getElementById('multi-room-id').value.trim();
   const res = await fetch('/api/room/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, roomId }) });
@@ -346,7 +429,11 @@ async function syncRoom() {
   if (!res.ok) return clearInterval(multiSyncInterval);
   const room = await res.json();
   document.getElementById('multi-players-list').innerHTML = room.players.map(p => `<div>🧑‍💻 ${p.name}</div>`).join('');
-  if (room.status === 'playing') { clearInterval(multiSyncInterval); document.getElementById('modal-multiplayer').classList.add('hidden'); startMultiGame(room); }
+  if (room.status === 'playing') { 
+    clearInterval(multiSyncInterval); 
+    document.getElementById('modal-multiplayer').classList.add('hidden'); 
+    startMultiGame(room); 
+  }
 }
 
 function startMultiGame(room) {
@@ -354,7 +441,7 @@ function startMultiGame(room) {
   document.getElementById('screen-game').classList.add('active');
   document.getElementById('room-chat-container').classList.remove('hidden');
   gameState = {
-    mode: 'A',
+    mode: room.mode || 'A',
     tickets: [generateTicket(), generateTicket(), generateTicket()],
     marks: [
       [new Array(9).fill(false), new Array(9).fill(false), new Array(9).fill(false)],
@@ -365,6 +452,7 @@ function startMultiGame(room) {
     bank: room.bank
   };
   renderTickets();
+  
   multiSyncInterval = setInterval(async () => {
     const res = await fetch(`/api/room/sync?roomId=${currentRoomId}`);
     const rState = await res.json();
@@ -372,16 +460,23 @@ function startMultiGame(room) {
       gameState.drawn = rState.drawn;
       let last = gameState.drawn[gameState.drawn.length-1];
       document.getElementById('drum-number').textContent = last;
+      speakDrumNumber(last);
       renderTickets();
     }
     if (rState.chat) {
       document.getElementById('room-chat-messages').innerHTML = rState.chat.map(m=>`<div><b>${m.name}:</b> ${m.text}</div>`).join('');
     }
-    if (gameState.tickets.some((t, ti) => ticketFullyMarked(t, gameState.marks[ti]))) {
-      clearInterval(multiSyncInterval); saveUser({ bills: user.bills + gameState.bank });
-      alert("🎉 Вы выиграли стол и забрали банк!"); location.reload();
+    if (checkWinCondition(gameState.mode, gameState.tickets, gameState.marks)) {
+      clearInterval(multiSyncInterval); 
+      saveUser({ bills: user.bills + gameState.bank });
+      triggerWinEffects("🎉 Вы выиграли стол и забрали весь банк!");
+      setTimeout(() => { location.reload(); }, 2000);
     }
-    if (rState.status === 'finished') { clearInterval(multiSyncInterval); alert("Игра завершена!"); location.reload(); }
+    if (rState.status === 'finished') { 
+      clearInterval(multiSyncInterval); 
+      alert("Игра завершена!"); 
+      location.reload(); 
+    }
   }, 1500);
 }
 
@@ -404,12 +499,14 @@ document.getElementById('btn-global-chat-send').addEventListener('click', async 
   const input = document.getElementById('global-chat-input');
   if(!input.value.trim()) return;
   await fetch('/api/chat/global/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, text: input.value.trim() }) });
-  input.value = ''; updateGlobalChat();
+  input.value = ''; 
+  updateGlobalChat();
 });
 
 async function updateGlobalChat() {
   if (document.getElementById('modal-global-chat').classList.contains('hidden')) return;
-  const res = await fetch('/api/chat/global'); const messages = await res.json();
+  const res = await fetch('/api/chat/global'); 
+  const messages = await res.json();
   const chatBox = document.getElementById('global-chat-messages');
   chatBox.innerHTML = messages.map(m => `<div><b>${m.name}:</b> ${m.text}</div>`).join('');
   chatBox.scrollTop = chatBox.scrollHeight;
@@ -418,100 +515,46 @@ setInterval(updateGlobalChat, 2000);
 
 document.getElementById('btn-admin-login').addEventListener('click', () => document.getElementById('modal-admin').classList.remove('hidden'));
 document.getElementById('btn-close-admin').addEventListener('click', () => document.getElementById('modal-admin').classList.add('hidden'));
-
 document.getElementById('btn-admin-auth').addEventListener('click', async () => {
   currentAdminPassword = document.getElementById('admin-password-input').value;
   await refreshAdminPanel();
 });
 
 async function refreshAdminPanel() {
-  const res = await fetch('/api/admin/players', { 
-    method: 'POST', 
-    headers: { 'Content-Type': 'application/json' }, 
-    body: JSON.stringify({ adminPassword: currentAdminPassword }) 
+  const res = await fetch('/api/admin/players', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminPassword: currentAdminPassword })
   });
-  
   if(!res.ok) return alert("Пароль неверный!");
-  
   document.getElementById('admin-auth-block').classList.add('hidden');
   document.getElementById('admin-panel-block').classList.remove('hidden');
   const players = await res.json();
-  
-  document.getElementById('admin-players-list').innerHTML = players.map(p => `
-    <div style="margin-bottom: 15px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 10px; border: 1px solid #ffd23f; text-align: left;">
-      <b>\${p.name}</b> \${p.isVip ? '👑 VIP' : ''} \${p.isBanned ? '🛑 ЗАБАНЕН' : ''} <br>
-      Баланс: \${p.bills}💵 | \${p.coins}🪙 <br>
-      
-      <div style="margin-top:5px;">
-        <input type="number" id="b-\${p.uid}" placeholder="+💵" style="width:60px; color:#000;">
-        <input type="number" id="c-\${p.uid}" placeholder="+🪙" style="width:60px; color:#000;">
-        <button class="btn" style="padding: 2px 8px; font-size:12px;" onclick="adminAction('\${p.uid}', 'give_resources')">Дать</button>
-      </div>
-
-      <div style="margin-top:5px;">
-        <input type="text" id="sms-\${p.uid}" placeholder="Текст СМС..." style="width:130px; color:#000;">
-        <button class="btn" style="padding: 2px 8px; font-size:12px; background: #3498db;" onclick="adminAction('\${p.uid}', 'send_sms')">СМС</button>
-      </div>
-
-      <div style="margin-top:5px; display:flex; gap:5px;">
-        <button class="btn" style="padding: 2px 8px; font-size:12px; background:#f1c40f;" onclick="adminAction('\${p.uid}', 'toggle_vip')">VIP +/-</button>
-        <button class="btn" style="padding: 2px 8px; font-size:12px; background:#e74c3c;" onclick="adminAction('\${p.uid}', 'toggle_ban')">\${p.isBanned ? 'Разбанить' : 'Бан'}</button>
-      </div>
-    </div>
-  `).join('');
+  document.getElementById('admin-players-list').innerHTML = players.map(p => `<div>${p.name} ${p.isVip ? '👑 VIP' : ''} ${p.isBanned ? '🛑 ЗАБАНЕН' : ''} Баланс: ${p.bills}💵 | ${p.coins}🪙</div>`).join('');
 }
-
-window.adminAction = async (targetUid, action) => {
-  let value = {};
-  if (action === 'give_resources') {
-    value.bills = document.getElementById(`b-\${targetUid}`).value || 0;
-    value.coins = document.getElementById(`c-\${targetUid}`).value || 0;
-  } else if (action === 'send_sms') {
-    value.text = document.getElementById(`sms-\${targetUid}`).value;
-    if (!value.text.trim()) return alert("Введите текст сообщения!");
-  }
-
-  const res = await fetch('/api/admin/control-player', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, action, value })
-  });
-
-  if (res.ok) {
-    alert("Действие выполнено успешно!");
-    refreshAdminPanel();
-  } else {
-    alert("Ошибка выполнения!");
-  }
-};
 
 function showGiftNotifications(gifts) {
   playNotificationSound();
-
   let b = 0; let c = 0; let messages = [];
   gifts.forEach(g => {
-    b += g.bills;
-    c += g.coins;
+    b += g.bills || 0;
+    c += g.coins || 0;
     if (g.message) messages.push(g.message);
   });
-
   const modal = document.getElementById('modal-gift-alert');
   const billsText = document.getElementById('gift-alert-bills');
   const coinsText = document.getElementById('gift-alert-coins');
-  
   if (messages.length > 0) {
     document.getElementById('gift-icon').textContent = "💬";
     document.getElementById('gift-title').textContent = "Сообщение от Админа";
-    document.getElementById('gift-sender').innerHTML = messages.map(m => `• \${m}`).join('<br>');
+    document.getElementById('gift-sender').innerHTML = messages.map(m => `• ${m}`).join('');
   } else {
     document.getElementById('gift-icon').textContent = "🎁";
     document.getElementById('gift-title').textContent = "Вам подарок!";
-    document.getElementById('gift-sender').innerHTML = "Получено от: <b>SANI GROUP</b>";
+    document.getElementById('gift-sender').innerHTML = "Получено от: SANI GROUP";
   }
-
-  billsText.textContent = b > 0 ? `+\${b} 💵` : '';
-  coinsText.textContent = c > 0 ? `+\${c} 🪙` : '';
-  
+  billsText.textContent = b > 0 ? `+${b} 💵 ` : '';
+  coinsText.textContent = c > 0 ? `+${c} 🪙` : '';
   modal.classList.remove('hidden');
   document.getElementById('btn-close-gift-alert').onclick = async () => {
     modal.classList.add('hidden');
@@ -525,9 +568,12 @@ function showGiftNotifications(gifts) {
 }
 
 document.getElementById('btn-play').addEventListener('click', () => openModal('setup'));
-document.getElementById('setup-start').addEventListener('click', () => { closeModal('setup'); startGame('A', 3); });
+document.getElementById('setup-start').addEventListener('click', () => {
+  closeModal('setup');
+  const selectedMode = document.querySelector('input[name="game-mode"]:checked').value;
+  startGame(selectedMode, 3);
+});
 document.getElementById('btn-exit-game').addEventListener('click', () => location.reload());
-
 document.getElementById('btn-sound').addEventListener('click', (e) => {
   soundOn = !soundOn;
   e.target.textContent = soundOn ? '🔊' : '🔇';

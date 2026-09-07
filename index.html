@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Лото Онлайн: Классика от SANI GROUP</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -20,19 +21,20 @@
           <div class="currency"><span id="cur-bills">0</span> 💵</div>
           <div class="currency"><span id="cur-coins">0</span> 🪙</div>
         </div>
-        <div class="menu-buttons">
-          <button class="btn" data-modal="daily">Ежедневные награды</button>
-          <button class="btn" data-modal="leaderboard">Лидерборд</button>
-          <button class="btn" data-modal="shop">Магазин</button>
-          <button class="btn" data-modal="marker">Маркер</button>
-          <button class="btn" data-modal="profile">Профиль</button>
-          <button class="btn" data-modal="rules">Правила</button>
-        </div>
       </div>
 
       <h1 class="game-title">ЛОТО ОНЛАЙН</h1>
 
-      <div style="display:flex; justify-content:center; gap:15px; margin-top:20px;">
+      <div class="menu-buttons">
+        <button class="btn" data-modal="daily">Ежедневные награды</button>
+        <button class="btn" data-modal="leaderboard">Лидерборд</button>
+        <button class="btn" data-modal="shop">Магазин</button>
+        <button class="btn" data-modal="marker">Маркер</button>
+        <button class="btn" data-modal="profile">Профиль</button>
+        <button class="btn" data-modal="rules">Правила</button>
+      </div>
+
+      <div style="display:flex; justify-content:center; gap:15px; margin-top:25px;">
         <button class="btn" id="btn-play">Играть с ботами</button>
         <button class="btn" id="btn-open-multiplayer">👥 Стол друзей</button>
       </div>
@@ -81,7 +83,7 @@
       <div class="modal-box">
         <button class="icon-close-modal" data-close="daily">✖</button>
         <h2>📆 Ежедневные награды</h2>
-        <div class="daily-grid" id="daily-grid"></div>
+        <div id="daily-grid"></div>
         <button class="btn" id="daily-claim" style="margin-top:15px;">Получить награду</button>
       </div>
     </div>
@@ -109,7 +111,7 @@
       <div class="modal-box">
         <button class="icon-close-modal" data-close="marker">✖</button>
         <h2>🖌 Выбор цвета маркера</h2>
-        <div class="marker-grid" id="marker-grid"></div>
+        <div id="marker-grid"></div>
       </div>
     </div>
 
@@ -119,8 +121,10 @@
         <button class="icon-close-modal" data-close="setup">✖</button>
         <h2>Настройка игры</h2>
         <h3>Режим игры</h3>
-        <div class="setup-options">
-          <label class="setup-option"><input type="radio" name="mode" value="A" checked> <b>А. Простое лото</b></label>
+        <div class="setup-options" style="text-align:left; margin-bottom:20px; display:flex; flex-direction:column; gap:10px;">
+          <label><input type="radio" name="game-mode" value="A" checked> <b>А. Простое лото</b> (всю карту)</label>
+          <label><input type="radio" name="game-mode" value="B"> <b>Б. Короткое лото</b> (1 любую строку)</label>
+          <label><input type="radio" name="game-mode" value="C"> <b>В. Три на три</b> (выигрыш по нижней строке)</label>
         </div>
         <button class="btn" id="setup-start">Начать игру</button>
       </div>
@@ -187,7 +191,7 @@
         <h2>👤 Профиль</h2>
         <input type="text" id="profile-name-input" style="padding:5px; text-align:center; color:#000;"><br>
         <div id="profile-current-avatar" style="font-size:40px; margin:10px 0;">🧑‍🦲</div>
-        <div class="avatar-grid" id="avatar-grid"></div>
+        <div id="avatar-grid"></div>
         <button class="btn" id="profile-save">Сохранить</button>
       </div>
     </div>
