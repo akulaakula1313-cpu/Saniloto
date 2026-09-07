@@ -33,7 +33,7 @@ function defaultUser(name) {
     name: name || 'Премиум_Игрок_' + Math.floor(1000 + Math.random() * 9000),
     avatar: 0, 
     marker: 0, 
-    unlockedMarkers:, // ОШИБКА ИСПРАВЛЕНА ТУТ
+    unlockedMarkers: [0],
     bills: 5000, 
     coins: 50, 
     dailyStreak: 0, 
