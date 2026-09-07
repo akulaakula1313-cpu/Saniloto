@@ -33,7 +33,7 @@ function defaultUser(name) {
     name: name || 'Премиум_Игрок_' + Math.floor(1000 + Math.random() * 9000),
     avatar: 0, 
     marker: 0, 
-    unlockedMarkers: [0], 
+    unlockedMarkers:, // ОШИБКА ИСПРАВЛЕНА ТУТ
     bills: 5000, 
     coins: 50, 
     dailyStreak: 0, 
@@ -147,12 +147,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   let filePath = pathname === '/' ? '/index.html' : pathname;
-  if (filePath === '/script.js') filePath = '/client.js'; # fallback connection map
   const fullPath = path.join(__dirname, filePath);
   fs.readFile(fullPath, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not Found'); return; }
-    const ext = path.extname(fullPath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(fullPath)] || 'application/octet-stream' });
     res.end(data);
   });
 });
