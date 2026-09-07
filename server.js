@@ -23,7 +23,11 @@ function loadDB() {
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
     return initial;
   }
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  try {
+    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  } catch(e) {
+    return { users: {}, leaderboard: [] };
+  }
 }
 
 function saveDB(db) {
@@ -66,7 +70,6 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const { pathname, searchParams } = url;
 
-  // Проверка на бан
   const checkUid = searchParams.get('uid');
   if (checkUid) {
     const db = loadDB();
@@ -108,7 +111,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/room/create' && req.method === 'POST') {
-    const { uid, maxPlayers, stake } = await readBody(req);
+    const { uid, maxPlayers, stake, mode } = await readBody(req);
     const db = loadDB();
     const user = db.users[uid];
     if (!user || user.bills < stake) return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
@@ -125,6 +128,7 @@ const server = http.createServer(async (req, res) => {
       id: roomId,
       stake: parseInt(stake, 10),
       maxPlayers: parseInt(maxPlayers, 10),
+      mode: mode || 'A',
       players: [{ uid, name: user.name, avatar: user.avatar, tickets: [] }],
       status: 'waiting',
       deck: Array.from({ length: 90 }, (_, i) => i + 1).sort(() => Math.random() - 0.5),
@@ -256,17 +260,10 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { ok: true });
   }
 
-  // --- ИСПРАВЛЕНИЕ ЗАГРУЗКИ ФАЙЛОВ ДЛЯ ХОСТИНГА LINUX / RENDER ---
-  let safePath = pathname === '/' ? 'index.html' : pathname.substring(1);
-  const fullPath = path.resolve(__dirname, safePath);
-
+  let filePath = pathname === '/' ? '/index.html' : pathname;
+  const fullPath = path.join(__dirname, filePath);
   fs.readFile(fullPath, (err, data) => {
-    if (err) { 
-      console.error(`Ошибка чтения файла по пути: ${fullPath}`, err);
-      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Not Found'); 
-      return; 
-    }
+    if (err) { res.writeHead(404); res.end('Not Found'); return; }
     const ext = path.extname(fullPath).toLowerCase();
     res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
     res.end(data);
