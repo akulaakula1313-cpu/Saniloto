@@ -218,6 +218,47 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, Object.entries(db.users).map(([k, v]) => ({ uid: k, ...v })));
   }
 
+  // Админские действия: бан/разбан, деньги, монеты, VIP и персональное сообщение.
+  if (pathname === '/api/admin/action' && req.method === 'POST') {
+    const body = await readBody(req);
+    const { adminPassword, action, uid, bills, coins, message } = body;
+    if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+      return sendJSON(res, 401, { error: 'Wrong password' });
+    }
+    const db = loadDB();
+    const target = db.users[uid];
+    if (!target) return sendJSON(res, 404, { error: 'Игрок не найден' });
+
+    const numBills = Math.max(0, Math.floor(Number(bills) || 0));
+    const numCoins = Math.max(0, Math.floor(Number(coins) || 0));
+
+    if (action === 'ban') target.isBanned = true;
+    else if (action === 'unban') target.isBanned = false;
+    else if (action === 'vip_on') target.isVip = true;
+    else if (action === 'vip_off') target.isVip = false;
+    else if (action === 'give') {
+      target.bills = Math.max(0, (target.bills || 0) + numBills);
+      target.coins = Math.max(0, (target.coins || 0) + numCoins);
+    } else if (action === 'message') {
+      const text = String(message || '').trim().slice(0, 500);
+      if (!text) return sendJSON(res, 400, { error: 'Введите сообщение' });
+      if (!Array.isArray(target.pendingGifts)) target.pendingGifts = [];
+      target.pendingGifts.push({ bills: 0, coins: 0, message: text, createdAt: Date.now() });
+      if (target.pendingGifts.length > 20) target.pendingGifts = target.pendingGifts.slice(-20);
+    } else if (action === 'gift_message') {
+      const text = String(message || '').trim().slice(0, 500);
+      if (!text && !numBills && !numCoins) return sendJSON(res, 400, { error: 'Добавьте подарок или сообщение' });
+      if (!Array.isArray(target.pendingGifts)) target.pendingGifts = [];
+      target.pendingGifts.push({ bills: numBills, coins: numCoins, message: text, createdAt: Date.now() });
+      if (target.pendingGifts.length > 20) target.pendingGifts = target.pendingGifts.slice(-20);
+      target.bills = Math.max(0, (target.bills || 0) + numBills);
+      target.coins = Math.max(0, (target.coins || 0) + numCoins);
+    } else return sendJSON(res, 400, { error: 'Неизвестное действие' });
+
+    saveDB(db);
+    return sendJSON(res, 200, { ok: true, user: { uid, ...target } });
+  }
+
   const fileMap = {
     '/': 'index.html',
     '/index.html': 'index.html',
