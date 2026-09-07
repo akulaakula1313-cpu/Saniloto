@@ -23,11 +23,7 @@ function loadDB() {
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
     return initial;
   }
-  try {
-    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-  } catch(e) {
-    return { users: {}, leaderboard: [] };
-  }
+  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
 }
 
 function saveDB(db) {
@@ -39,7 +35,7 @@ function defaultUser(name) {
     name: name || 'Игрок_' + Math.floor(1000 + Math.random() * 9000),
     avatar: 0,
     marker: 0,
-    unlockedMarkers:,
+    unlockedMarkers: [0],
     bills: 5000,
     coins: 50,
     dailyStreak: 0,
@@ -117,9 +113,7 @@ const server = http.createServer(async (req, res) => {
     if (!user || user.bills < stake) return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
 
     let roomId;
-    do {
-      roomId = Math.floor(1000 + Math.random() * 9000).toString();
-    } while (rooms[roomId]);
+    do { roomId = Math.floor(1000 + Math.random() * 9000).toString(); } while (rooms[roomId]);
 
     user.bills -= stake;
     saveDB(db);
@@ -184,9 +178,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/api/admin/players' && req.method === 'POST') {
     const { adminPassword } = await readBody(req);
-    if (adminPassword !== 'admin123') {
-      return sendJSON(res, 403, { error: 'Неверный пароль администратора!' });
-    }
+    if (adminPassword !== 'admin123') return sendJSON(res, 403, { error: 'Неверный пароль администратора!' });
     const db = loadDB();
     const playersList = Object.keys(db.users).map(id => ({
       uid: id,
