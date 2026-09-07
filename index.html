@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loto Online Premium</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    
+    <!-- ЭКРАН МЕНЮ -->
+    <div id="screen-menu" class="screen active">
+      <div class="header-panel">
+        <div class="user-badge" id="btn-profile" data-modal="profile">
+          <div class="avatar-ring">
+            <span id="menu-avatar-emoji" class="emoji-glow">🧑‍🦲</span>
+          </div>
+          <div class="user-info">
+            <span id="menu-avatar-name" class="username">Загрузка...</span>
+            <span class="rank-text">Игрок Премиум</span>
+          </div>
+        </div>
+        <div class="wallet-panel">
+          <div class="wallet-item bills">
+            <span class="icon">💵</span> <span id="cur-bills">0</span>
+          </div>
+          <div class="wallet-item coins">
+            <span class="icon">🪙</span> <span id="cur-coins">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-layout">
+        <div class="main-buttons">
+          <button id="btn-play" class="btn-premium play">
+            <span class="btn-icon">🪵</span>
+            <div class="btn-text">
+              <span class="title">Классический матч</span>
+              <span class="subtitle">Играть в одиночку</span>
+            </div>
+          </button>
+          <button id="btn-open-multiplayer" class="btn-premium multiplayer">
+            <span class="btn-icon">👥</span>
+            <div class="btn-text">
+              <span class="title">Стол с друзьями</span>
+              <span class="subtitle">Игра на реальные ставки</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="sidebar-buttons">
+          <button class="btn-nav" data-modal="daily">📆 Награды</button>
+          <button class="btn-nav" id="btn-open-global-chat">💬 Общий чат</button>
+          <button class="btn-nav" data-modal="leaderboard">🏆 Рейтинг</button>
+          <button class="btn-nav" data-modal="shop">🏪 Магазин</button>
+          <button class="btn-nav" data-modal="marker">🎨 Маркеры</button>
+          <button class="btn-nav" id="btn-admin-login">👑 Админ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ИГРОВОЙ ЭКРАН -->
+    <div id="screen-game" class="screen">
+      <div class="game-header">
+        <button id="btn-exit-game" class="btn-exit">✕ Выйти</button>
+        <div class="drum-zone">
+          <div class="drum-container">
+            <div id="drum-number" class="drum-sphere">—</div>
+          </div>
+          <div id="drum-nickname" class="barrel-nickname"></div>
+        </div>
+        <div class="game-user">
+          <span id="game-player-avatar">🧑‍🦲</span>
+          <span id="game-player-name">...</span>
+          <div class="game-wallet">
+            <span>💵 <span id="game-cur-bills">0</span></span>
+            <span>🪙 <span id="game-cur-coins">0</span></span>
+          </div>
+        </div>
+      </div>
+      <div id="tickets-container"></div>
+    </div>
+
+    <!-- МОДАЛЬНЫЕ ОКНА -->
+    <div id="modal-setup" class="modal hidden">
+      <div class="modal-box">
+        <h2>Параметры матча</h2>
+        <div class="setup-option active">
+          <input type="radio" id="mode-classic" checked>
+          <label for="mode-classic">Классический режим (1 карточка)</label>
+        </div>
+        <div class="modal-actions">
+          <button id="setup-start" class="btn-glow">Играть</button>
+          <button onclick="document.getElementById('modal-setup').classList.add('hidden')" class="btn-secondary">Назад</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-global-chat" class="modal hidden">
+      <div class="modal-box chat-box">
+        <div class="modal-header">
+          <h3>💬 Общий ЧАТ</h3>
+          <button id="btn-close-global-chat" class="btn-close">✕</button>
+        </div>
+        <div id="global-chat-messages" class="chat-messages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="global-chat-input" placeholder="Напишите сообщение...">
+          <button id="btn-global-chat-send" class="btn-glow">Отправить</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-profile" class="modal hidden">
+      <div class="modal-box">
+        <h3>Редактировать профиль</h3>
+        <input type="text" id="profile-name-input" class="premium-input">
+        <div class="avatar-current-row">
+          Текущий аватар: <span id="profile-current-avatar" style="font-size: 2rem;"></span>
+        </div>
+        <div id="avatar-grid" class="avatar-selection-grid"></div>
+        <div class="modal-actions">
+          <button id="profile-save" class="btn-glow">Сохранить</button>
+          <button onclick="document.getElementById('modal-profile').classList.add('hidden')" class="btn-secondary">Отмена</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-daily" class="modal hidden">
+      <div class="modal-box">
+        <h3>📆 Календарь подарков</h3>
+        <div id="daily-grid" class="daily-rewards-grid"></div>
+        <button id="daily-claim" class="btn-glow" style="margin-top: 20px;">Получить награду</button>
+        <button onclick="document.getElementById('modal-daily').classList.add('hidden')" class="btn-secondary">Закрыть</button>
+      </div>
+    </div>
+
+    <div id="modal-leaderboard" class="modal hidden">
+      <div class="modal-box">
+        <h3>🏆 Рейтинг игроков</h3>
+        <div id="leaderboard-list" class="scroll-list"></div>
+        <button onclick="document.getElementById('modal-leaderboard').classList.add('hidden')" class="btn-secondary" style="margin-top:15px;">Закрыть</button>
+      </div>
+    </div>
+
+    <div id="modal-shop" class="modal hidden">
+      <div class="modal-box">
+        <h3>🏪 Магазин обмена</h3>
+        <div id="shop-list" class="shop-grid"></div>
+        <button onclick="document.getElementById('modal-shop').classList.add('hidden')" class="btn-secondary" style="margin-top:15px;">Выйти</button>
+      </div>
+    </div>
+
+    <div id="modal-marker" class="modal hidden">
+      <div class="modal-box">
+        <h3>🎨 Выбор фишки</h3>
+        <div id="marker-grid" class="marker-grid"></div>
+        <button onclick="document.getElementById('modal-marker').classList.add('hidden')" class="btn-secondary" style="margin-top:15px;">Закрыть</button>
+      </div>
+    </div>
+
+    <div id="modal-multiplayer" class="modal hidden">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>👥 Стол Лото с Друзьями</h3>
+          <button id="btn-close-multiplayer" class="btn-close">✕</button>
+        </div>
+        
+        <div id="multi-create-block" class="multi-section">
+          <h4>Создать новый стол</h4>
+          <div class="input-group">
+            <label>Мест за столом (2-6):</label>
+            <input type="number" id="multi-max-players" value="2" min="2" max="6">
+          </div>
+          <div class="input-group">
+            <label>Ставка стола (💵):</label>
+            <input type="number" id="multi-stake" value="300" step="50">
+          </div>
+          <button id="btn-multi-create" class="btn-glow">Получить номер стола</button>
+        </div>
+
+        <div id="multi-join-block" class="multi-section">
+          <h4>Подключиться к другу</h4>
+          <input type="text" id="multi-room-id" placeholder="Код стола (4 цифры)">
+          <button id="btn-multi-join" class="btn-glow">Войти за стол</button>
+        </div>
+
+        <div id="multi-waiting-block" class="multi-section hidden">
+          <div class="table-code-badge">
+            <span>Код стола:</span>
+            <h2 id="txt-table-code">0000</h2>
+          </div>
+          <p class="pulse-text">Ожидание оппонентов...</p>
+          <div id="multi-players-list" class="players-waiting-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-admin" class="modal hidden">
+      <div class="modal-box">
+        <h3>👑 Управление SANI GROUP</h3>
+        <div id="admin-auth-block">
+          <input type="password" id="admin-password-input" placeholder="Пароль администратора" class="premium-input">
+          <button id="btn-admin-auth" class="btn-glow" style="margin-top: 10px;">Войти</button>
+        </div>
+        <div id="admin-panel-block" class="hidden">
+          <button id="btn-admin-clear-top" class="btn-danger">Обнулить счета игроков</button>
+          <h4>Список игроков:</h4>
+          <div id="admin-players-list" class="scroll-list"></div>
+        </div>
+        <button id="btn-close-admin" class="btn-secondary" style="margin-top: 15px;">Закрыть</button>
+      </div>
+    </div>
+
+    <div id="modal-gift-alert" class="modal hidden">
+      <div class="modal-box alert-box">
+        <div id="gift-alert-icon" style="font-size: 4rem;">🎁</div>
+        <h3 id="gift-alert-title">Уведомление</h3>
+        <p id="gift-alert-text"></p>
+        <div id="gift-currency-show" class="wallet-panel" style="justify-content: center; margin-bottom: 15px;"></div>
+        <button id="btn-close-gift-alert" class="btn-glow">Понятно</button>
+      </div>
+    </div>
+
+  </div>
+  <script src="client.js"></script>
+</body>
+</html>
