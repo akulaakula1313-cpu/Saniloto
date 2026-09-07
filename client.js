@@ -13,7 +13,6 @@ const SHOP_ITEMS = [
   { bills: 500, coins: 10 }, { bills: 1000, coins: 15 }, { bills: 2000, coins: 29 }, { bills: 4000, coins: 49 }, { bills: 10000, coins: 79 }
 ];
 const DRAW_INTERVAL = 4000;
-const STAKE = 300;
 
 const NICKNAMES = {
   1: 'Кол', 3: 'Троечка', 11: 'Барабанные палочки', 12: 'Дюжина', 13: 'Чёртова дюжина',
@@ -26,9 +25,47 @@ let user = null;
 let currentRoomId = null;
 let multiSyncInterval = null;
 let currentAdminPassword = "";
+let soundOn = true;
+
+function playNotificationSound() {
+  if (!soundOn) return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
+    gain1.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start();
+    osc1.stop(ctx.currentTime + 0.15);
+
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880, ctx.currentTime);
+      gain2.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start();
+      osc2.stop(ctx.currentTime + 0.2);
+    }, 120);
+  } catch (e) { console.log(e); }
+}
 
 async function loadUser() {
   const res = await fetch(`/api/state?uid=${uid || ''}`);
+  if (res.status === 403) {
+    alert("Доступ заблокирован администратором!");
+    document.body.innerHTML = "<h1 style='text-align:center; color:white; margin-top:100px;'>Вы заблокированы 🚫</h1>";
+    return;
+  }
   const data = await res.json();
   uid = data.uid;
   localStorage.setItem('loto_uid', uid);
@@ -51,7 +88,13 @@ function saveUser(patch) {
 function renderMenu() {
   if (!user) return;
   document.getElementById('menu-avatar-emoji').textContent = AVATARS[user.avatar] || AVATARS[0];
-  document.getElementById('menu-avatar-name').textContent = user.name;
+  
+  if (user.isVip) {
+    document.getElementById('menu-avatar-name').innerHTML = `${user.name} <span class="vip-gold-text">👑 VIP</span>`;
+  } else {
+    document.getElementById('menu-avatar-name').textContent = user.name;
+  }
+  
   document.getElementById('cur-bills').textContent = user.bills;
   document.getElementById('cur-coins').textContent = user.coins;
 }
@@ -201,7 +244,6 @@ function generateTicket() {
 }
 
 let gameState = null;
-function logEvent(text) { document.getElementById('event-log').textContent = text; }
 
 function startGame(mode, numCards) {
   document.getElementById('screen-menu').classList.remove('active');
@@ -376,38 +418,120 @@ setInterval(updateGlobalChat, 2000);
 
 document.getElementById('btn-admin-login').addEventListener('click', () => document.getElementById('modal-admin').classList.remove('hidden'));
 document.getElementById('btn-close-admin').addEventListener('click', () => document.getElementById('modal-admin').classList.add('hidden'));
+
 document.getElementById('btn-admin-auth').addEventListener('click', async () => {
   currentAdminPassword = document.getElementById('admin-password-input').value;
-  const res = await fetch('/api/admin/players', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword: currentAdminPassword }) });
+  await refreshAdminPanel();
+});
+
+async function refreshAdminPanel() {
+  const res = await fetch('/api/admin/players', { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' }, 
+    body: JSON.stringify({ adminPassword: currentAdminPassword }) 
+  });
+  
   if(!res.ok) return alert("Пароль неверный!");
+  
   document.getElementById('admin-auth-block').classList.add('hidden');
   document.getElementById('admin-panel-block').classList.remove('hidden');
   const players = await res.json();
-  document.getElementById('admin-players-list').innerHTML = players.map(p => `<div style="margin-bottom:8px;"><b>${p.name}</b> (${p.bills}💵)<br> <input type="number" id="b-${p.uid}" placeholder="+💵" style="width:60px; color:#000;"> <button class="btn" onclick="giveGift('${p.uid}')">Подарить</button></div>`).join('');
-});
+  
+  document.getElementById('admin-players-list').innerHTML = players.map(p => `
+    <div style="margin-bottom: 15px; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 10px; border: 1px solid #ffd23f; text-align: left;">
+      <b>\${p.name}</b> \${p.isVip ? '👑 VIP' : ''} \${p.isBanned ? '🛑 ЗАБАНЕН' : ''} <br>
+      Баланс: \${p.bills}💵 | \${p.coins}🪙 <br>
+      
+      <div style="margin-top:5px;">
+        <input type="number" id="b-\${p.uid}" placeholder="+💵" style="width:60px; color:#000;">
+        <input type="number" id="c-\${p.uid}" placeholder="+🪙" style="width:60px; color:#000;">
+        <button class="btn" style="padding: 2px 8px; font-size:12px;" onclick="adminAction('\${p.uid}', 'give_resources')">Дать</button>
+      </div>
 
-window.giveGift = async (targetUid) => {
-  const amountBills = document.getElementById(`b-${targetUid}`).value || 0;
-  await fetch('/api/admin/give-reward', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, amountBills, amountCoins: 0 }) });
-  alert("Подарок отправлен!");
+      <div style="margin-top:5px;">
+        <input type="text" id="sms-\${p.uid}" placeholder="Текст СМС..." style="width:130px; color:#000;">
+        <button class="btn" style="padding: 2px 8px; font-size:12px; background: #3498db;" onclick="adminAction('\${p.uid}', 'send_sms')">СМС</button>
+      </div>
+
+      <div style="margin-top:5px; display:flex; gap:5px;">
+        <button class="btn" style="padding: 2px 8px; font-size:12px; background:#f1c40f;" onclick="adminAction('\${p.uid}', 'toggle_vip')">VIP +/-</button>
+        <button class="btn" style="padding: 2px 8px; font-size:12px; background:#e74c3c;" onclick="adminAction('\${p.uid}', 'toggle_ban')">\${p.isBanned ? 'Разбанить' : 'Бан'}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.adminAction = async (targetUid, action) => {
+  let value = {};
+  if (action === 'give_resources') {
+    value.bills = document.getElementById(`b-\${targetUid}`).value || 0;
+    value.coins = document.getElementById(`c-\${targetUid}`).value || 0;
+  } else if (action === 'send_sms') {
+    value.text = document.getElementById(`sms-\${targetUid}`).value;
+    if (!value.text.trim()) return alert("Введите текст сообщения!");
+  }
+
+  const res = await fetch('/api/admin/control-player', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminPassword: currentAdminPassword, targetUid, action, value })
+  });
+
+  if (res.ok) {
+    alert("Действие выполнено успешно!");
+    refreshAdminPanel();
+  } else {
+    alert("Ошибка выполнения!");
+  }
 };
 
 function showGiftNotifications(gifts) {
-  let b = 0; gifts.forEach(g => b += g.bills);
-  document.getElementById('gift-alert-bills').textContent = `+${b} 💵`;
-  document.getElementById('modal-gift-alert').classList.remove('hidden');
-  document.getElementById('btn-close-gift-alert').onclick = () => {
-    document.getElementById('modal-gift-alert').classList.add('hidden');
-    saveUser({ pendingGifts: [] });
+  playNotificationSound();
+
+  let b = 0; let c = 0; let messages = [];
+  gifts.forEach(g => {
+    b += g.bills;
+    c += g.coins;
+    if (g.message) messages.push(g.message);
+  });
+
+  const modal = document.getElementById('modal-gift-alert');
+  const billsText = document.getElementById('gift-alert-bills');
+  const coinsText = document.getElementById('gift-alert-coins');
+  
+  if (messages.length > 0) {
+    document.getElementById('gift-icon').textContent = "💬";
+    document.getElementById('gift-title').textContent = "Сообщение от Админа";
+    document.getElementById('gift-sender').innerHTML = messages.map(m => `• \${m}`).join('<br>');
+  } else {
+    document.getElementById('gift-icon').textContent = "🎁";
+    document.getElementById('gift-title').textContent = "Вам подарок!";
+    document.getElementById('gift-sender').innerHTML = "Получено от: <b>SANI GROUP</b>";
+  }
+
+  billsText.textContent = b > 0 ? `+\${b} 💵` : '';
+  coinsText.textContent = c > 0 ? `+\${c} 🪙` : '';
+  
+  modal.classList.remove('hidden');
+  document.getElementById('btn-close-gift-alert').onclick = async () => {
+    modal.classList.add('hidden');
+    await fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, pendingGifts: [] })
+    });
+    location.reload();
   };
 }
+
 document.getElementById('btn-play').addEventListener('click', () => openModal('setup'));
 document.getElementById('setup-start').addEventListener('click', () => { closeModal('setup'); startGame('A', 3); });
 document.getElementById('btn-exit-game').addEventListener('click', () => location.reload());
 
-let soundOn = true;
 document.getElementById('btn-sound').addEventListener('click', (e) => {
   soundOn = !soundOn;
   e.target.textContent = soundOn ? '🔊' : '🔇';
 });
+
 loadUser();
+setInterval(loadUser, 5000);

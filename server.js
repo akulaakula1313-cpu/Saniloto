@@ -41,14 +41,15 @@ function defaultUser(name) {
     dailyStreak: 0,
     lastClaim: 0,
     createdAt: Date.now(),
-    pendingGifts: []
+    pendingGifts: [],
+    isVip: false,
+    isBanned: false
   };
 }
 
 function sendJSON(res, status, data) {
-  const body = JSON.stringify(data);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(body);
+  res.end(JSON.stringify(data));
 }
 
 async function readBody(req) {
@@ -64,6 +65,15 @@ async function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const { pathname, searchParams } = url;
+
+  // Проверка на бан
+  const checkUid = searchParams.get('uid');
+  if (checkUid) {
+    const db = loadDB();
+    if (db.users[checkUid] && db.users[checkUid].isBanned) {
+      return sendJSON(res, 403, { error: 'banned', message: 'Вы заблокированы администратором!' });
+    }
+  }
 
   if (pathname === '/api/state' && req.method === 'GET') {
     const db = loadDB();
@@ -81,6 +91,7 @@ const server = http.createServer(async (req, res) => {
     const { uid, ...update } = body;
     const db = loadDB();
     if (!uid || !db.users[uid]) return sendJSON(res, 400, { error: 'bad_uid' });
+    if (db.users[uid].isBanned) return sendJSON(res, 403, { error: 'banned' });
     db.users[uid] = { ...db.users[uid], ...update };
     saveDB(db);
     return sendJSON(res, 200, { ok: true, user: db.users[uid] });
@@ -177,30 +188,43 @@ const server = http.createServer(async (req, res) => {
       uid: id,
       name: db.users[id].name,
       bills: db.users[id].bills,
-      coins: db.users[id].coins
+      coins: db.users[id].coins,
+      isVip: db.users[id].isVip || false,
+      isBanned: db.users[id].isBanned || false
     }));
     return sendJSON(res, 200, playersList);
   }
 
-  if (pathname === '/api/admin/give-reward' && req.method === 'POST') {
-    const { adminPassword, targetUid, amountBills, amountCoins } = await readBody(req);
-    if (adminPassword !== 'admin123') {
-      return sendJSON(res, 403, { error: 'Неверный пароль администратора!' });
-    }
+  if (pathname === '/api/admin/control-player' && req.method === 'POST') {
+    const { adminPassword, targetUid, action, value } = await readBody(req);
+    if (adminPassword !== 'admin123') return sendJSON(res, 403, { error: 'Неверный пароль!' });
+    
     const db = loadDB();
     if (!db.users[targetUid]) return sendJSON(res, 404, { error: 'Игрок не найден!' });
 
-    const bills = parseInt(amountBills || 0, 10);
-    const coins = parseInt(amountCoins || 0, 10);
+    const player = db.users[targetUid];
 
-    db.users[targetUid].bills += bills;
-    db.users[targetUid].coins += coins;
-    
-    if (!db.users[targetUid].pendingGifts) db.users[targetUid].pendingGifts = [];
-    db.users[targetUid].pendingGifts.push({ from: "SANI GROUP", bills, coins, time: Date.now() });
-    
+    if (action === 'give_resources') {
+      const b = parseInt(value.bills || 0, 10);
+      const c = parseInt(value.coins || 0, 10);
+      player.bills += b;
+      player.coins += c;
+      if (!player.pendingGifts) player.pendingGifts = [];
+      player.pendingGifts.push({ from: "SANI GROUP", bills: b, coins: c, time: Date.now() });
+    } 
+    else if (action === 'send_sms') {
+      if (!player.pendingGifts) player.pendingGifts = [];
+      player.pendingGifts.push({ from: "Администрация", bills: 0, coins: 0, message: value.text, time: Date.now() });
+    } 
+    else if (action === 'toggle_vip') {
+      player.isVip = !player.isVip;
+    } 
+    else if (action === 'toggle_ban') {
+      player.isBanned = !player.isBanned;
+    }
+
     saveDB(db);
-    return sendJSON(res, 200, { ok: true, user: db.users[targetUid] });
+    return sendJSON(res, 200, { ok: true, player });
   }
 
   if (pathname === '/api/chat/global' && req.method === 'GET') {
@@ -230,38 +254,6 @@ const server = http.createServer(async (req, res) => {
 
     room.chat.push({ name: user.name, text: text.trim().substring(0, 150), time: Date.now() });
     return sendJSON(res, 200, { ok: true });
-  }
-
-
-  if (pathname === '/api/admin/send-message' && req.method === 'POST') {
-    const { adminPassword, targetUid, message } = await readBody(req);
-    if (adminPassword !== 'admin123') return sendJSON(res,403,{error:'bad_password'});
-    const db = loadDB();
-    if (!db.users[targetUid]) return sendJSON(res,404,{error:'player_not_found'});
-    db.users[targetUid].messages = db.users[targetUid].messages || [];
-    db.users[targetUid].messages.push({text:String(message||'').substring(0,200),time:Date.now()});
-    saveDB(db);
-    return sendJSON(res,200,{ok:true});
-  }
-
-  if (pathname === '/api/admin/set-vip' && req.method === 'POST') {
-    const { adminPassword, targetUid, vip } = await readBody(req);
-    if (adminPassword !== 'admin123') return sendJSON(res,403,{error:'bad_password'});
-    const db = loadDB();
-    if (!db.users[targetUid]) return sendJSON(res,404,{error:'player_not_found'});
-    db.users[targetUid].vip = !!vip;
-    saveDB(db);
-    return sendJSON(res,200,{ok:true});
-  }
-
-  if (pathname === '/api/admin/block' && req.method === 'POST') {
-    const { adminPassword, targetUid, blocked } = await readBody(req);
-    if (adminPassword !== 'admin123') return sendJSON(res,403,{error:'bad_password'});
-    const db = loadDB();
-    if (!db.users[targetUid]) return sendJSON(res,404,{error:'player_not_found'});
-    db.users[targetUid].blocked = !!blocked;
-    saveDB(db);
-    return sendJSON(res,200,{ok:true});
   }
 
   let filePath = pathname === '/' ? '/index.html' : pathname;
