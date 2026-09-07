@@ -15,8 +15,17 @@ body {
 
 #app { position: relative; min-height: 100vh; }
 
+/* Правила скрытия для экранов и модалок */
 .screen { display: none; padding: 20px; }
 .screen.active { display: block; }
+
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal.hidden, .hidden { display: none !important; }
 
 /* ---------- кнопки ---------- */
 .btn {
@@ -33,6 +42,7 @@ body {
 }
 .btn:hover { filter: brightness(1.08); }
 .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #a85700; }
+.btn:disabled { opacity: .5; cursor: not-allowed; filter: none; }
 
 .icon-btn {
   background: #f5a83b;
@@ -88,15 +98,7 @@ body {
   padding: 14px 50px;
 }
 
-/* ---------- модалки ---------- */
-.modal {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,.55);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 50;
-}
-.modal.hidden { display: none; }
-
+/* ---------- модальные коробки ---------- */
 .modal-box {
   background: linear-gradient(#a86a3d, #8a5228);
   border: 3px solid #4a2c14;
@@ -125,11 +127,13 @@ body {
   border-radius: 8px;
   padding: 10px 4px;
   font-weight: bold;
+  cursor: default;
 }
-.daily-cell.today { background: #6fd66f; color: #fff; }
+.daily-cell.today { background: #6fd66f; color: #fff; cursor: pointer; }
 .daily-cell.claimed { background: #b7935f; color: #fff; }
 .daily-cell .d-num { font-size: 12px; }
 .daily-cell .d-icon { font-size: 22px; margin: 4px 0; }
+.daily-cell .d-reward { font-size: 11px; }
 
 /* лидерборд */
 .leaderboard-list { text-align: left; max-height: 60vh; overflow-y: auto; }
@@ -148,7 +152,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   background: rgba(0,0,0,.3); padding: 8px 14px; border-radius: 8px;
 }
-.ad-btn { width: 100%; }
+.ad-btn { width: 100%; margin-bottom: 10px; }
 
 /* маркеры */
 .marker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
@@ -198,7 +202,6 @@ body {
   font-weight: bold;
   color: #ffd23f;
 }
-.hidden { display: none !important; }
 
 /* бочонок + прозвище */
 .drum-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -231,7 +234,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-size: 34px; font-weight: bold; color: #2b1608;
 }
-.bots-row { display: flex; gap: 16px; }
+.bots-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
 .bot-box { text-align: center; }
 .bot-box .avatar-emoji { font-size: 34px; }
 .bot-progress { font-size: 12px; margin-top: 2px; }
