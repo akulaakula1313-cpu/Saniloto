@@ -1,0 +1,21 @@
+{
+  "users": {
+    "641676f0409409be": {
+      "name": "Игрок_2167",
+      "avatar": 0,
+      "marker": 0,
+      "unlockedMarkers": [
+        0
+      ],
+      "bills": 5000,
+      "coins": 50,
+      "dailyStreak": 0,
+      "lastClaim": 0,
+      "createdAt": 1788787491387,
+      "pendingGifts": [],
+      "isVip": false,
+      "isBanned": false
+    }
+  },
+  "leaderboard": []
+}

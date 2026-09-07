@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Лото Онлайн: Классика от SANI GROUP</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -122,9 +121,9 @@
         <h2>Настройка игры</h2>
         <h3>Режим игры</h3>
         <div class="setup-options" style="text-align:left; margin-bottom:20px; display:flex; flex-direction:column; gap:10px;">
-          <label><input type="radio" name="game-mode" value="A" checked> <b>А. Простое лото</b> (всю карту)</label>
-          <label><input type="radio" name="game-mode" value="B"> <b>Б. Короткое лото</b> (1 любую строку)</label>
-          <label><input type="radio" name="game-mode" value="C"> <b>В. Три на три</b> (выигрыш по нижней строке)</label>
+          <label><input type="radio" class="game-mode-radio" name="game-mode" value="A" checked> <b>А. Простое лото</b> (всю карту)</label>
+          <label><input type="radio" class="game-mode-radio" name="game-mode" value="B"> <b>Б. Короткое лото</b> (1 любую строку)</label>
+          <label><input type="radio" class="game-mode-radio" name="game-mode" value="C"> <b>В. Три на три</b> (выигрыш по нижней строке)</label>
         </div>
         <button class="btn" id="setup-start">Начать игру</button>
       </div>

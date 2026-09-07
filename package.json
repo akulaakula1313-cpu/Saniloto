@@ -1,10 +1,9 @@
 {
-  "name": "loto-online",
+  "name": "sani-loto-online",
   "version": "1.0.0",
-  "description": "Серверная игра Лото Онлайн: Классика (без внешних зависимостей)",
+  "private": true,
+  "description": "Лото Онлайн — SANI GROUP",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {}
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
 }

@@ -1,8 +1,3 @@
-// client.js — Полный клиентский код для онлайн-игры ЛОТО
-
-// ==========================================
-// 1. КОНСТАНТЫ И ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ
-// ==========================================
 const AVATARS = ['🧑‍🦲', '👩‍🦰', '👩', '🧕', '👩🏻‍🦳', '👨🏽', '🧑‍🦱', '👱', '🧔', '🧑‍🦰'];
 const MARKERS = [
   { id: 0, color: '#8e44ad', cost: 0 },
@@ -33,35 +28,12 @@ let currentAdminPassword = "";
 let soundOn = true;
 let gameState = null;
 
-// Инициализация при загрузке документа
-window.addEventListener('DOMContentLoaded', () => {
-  loadUser();
-  initEventListeners();
-});
-
-// Навешивание обработчиков событий для модальных окон
-function initEventListeners() {
-  document.querySelectorAll('[data-modal]').forEach(btn => {
-    btn.addEventListener('click', () => openModal(btn.dataset.modal));
-  });
-  document.querySelectorAll('[data-close]').forEach(btn => {
-    btn.addEventListener('click', () => closeModal(btn.dataset.close));
-  });
-  
-  const dailyClaimBtn = document.getElementById('daily-claim');
-  if (dailyClaimBtn) {
-    dailyClaimBtn.addEventListener('click', claimDailyReward);
-  }
-}
-
-// ==========================================
-// 2. ОЗВУЧКА И АУДИОЭФФЕКТЫ
-// ==========================================
-function speakBall(n) {
+function speakDrumNumber(n) {
   if (!soundOn || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  let text = NICKNAMES[n] ? NICKNAMES[n] : n.toString();
-  let utterance = new SpeechSynthesisUtterance(text);
+  let text = n.toString();
+  if (NICKNAMES[n]) text = NICKNAMES[n];
+  const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'ru-RU';
   utterance.rate = 1.1;
   window.speechSynthesis.speak(utterance);
@@ -99,9 +71,6 @@ function playNotificationSound() {
   } catch (e) { console.log(e); }
 }
 
-// ==========================================
-// 3. РАБОТА С API И СИНХРОНИЗАЦИЯ СЕРВЕРА
-// ==========================================
 async function loadUser() {
   const res = await fetch(`/api/state?uid=${uid || ''}`);
   if (res.status === 403) {
@@ -128,72 +97,39 @@ function saveUser(patch) {
   if (document.getElementById('screen-game').classList.contains('active')) renderGameCurrency();
 }
 
-async function claimDailyReward() {
-  const res = await fetch('/api/dailyreward/claim', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uid })
-  });
-  const data = await res.json();
-  if (data.ok) { 
-    user = { ...user, ...data.user };
-    renderMenu();
-    renderDaily();
+function renderMenu() {
+  if (!user) return;
+  document.getElementById('menu-avatar-emoji').textContent = AVATARS[user.avatar] || AVATARS[0];
+  
+  if (user.isVip) {
+    document.getElementById('menu-avatar-name').innerHTML = `${user.name} <span class="vip-gold-text">👑 VIP</span>`;
+  } else {
+    document.getElementById('menu-avatar-name').textContent = user.name;
   }
+  
+  document.getElementById('cur-bills').textContent = user.bills;
+  document.getElementById('cur-coins').textContent = user.coins;
 }
 
-function showGiftNotifications(gifts) {
-  console.log("Новые подарки:", gifts);
+function renderGameCurrency() {
+  document.getElementById('game-cur-bills').textContent = user.bills;
+  document.getElementById('game-cur-coins').textContent = user.coins;
 }
 
-// ==========================================
-// 4. УПРАВЛЕНИЕ МОДАЛЬНЫМИ ОКНАМИ И ОКНАМИ ИНТЕРФЕЙСА
-// ==========================================
 function openModal(name) {
-  const modal = document.getElementById('modal-' + name);
-  if (modal) modal.classList.remove('hidden');
+  document.getElementById('modal-' + name).classList.remove('hidden');
   if (name === 'daily') renderDaily();
   if (name === 'leaderboard') renderLeaderboard();
   if (name === 'shop') renderShop();
   if (name === 'marker') renderMarkers();
   if (name === 'profile') renderProfile();
 }
-
 function closeModal(name) {
-  const modal = document.getElementById('modal-' + name);
-  if (modal) modal.classList.add('hidden');
+  document.getElementById('modal-' + name).classList.add('hidden');
 }
 
-// ==========================================
-// 5. ОТРИСОВКА ИНТЕРФЕЙСА И РЕНДЕРИНГ КОМПОНЕНТОВ
-// ==========================================
-function renderMenu() {
-  if (!user) return;
-  const avatarEmojiEl = document.getElementById('menu-avatar-emoji');
-  const avatarNameEl = document.getElementById('menu-avatar-name');
-  const curBillsEl = document.getElementById('cur-bills');
-  const curCoinsEl = document.getElementById('cur-coins');
-
-  if (avatarEmojiEl) avatarEmojiEl.textContent = AVATARS[user.avatar] || AVATARS[0];
-  
-  if (avatarNameEl) {
-    if (user.isVip) {
-      avatarNameEl.innerHTML = `${user.name} <span class="vip-gold-text">👑 VIP</span>`;
-    } else {
-      avatarNameEl.textContent = user.name;
-    }
-  }
-  
-  if (curBillsEl) curBillsEl.textContent = user.bills;
-  if (curCoinsEl) curCoinsEl.textContent = user.coins;
-}
-
-function renderGameCurrency() {
-  const gameBillsEl = document.getElementById('game-cur-bills');
-  const gameCoinsEl = document.getElementById('game-cur-coins');
-  if (gameBillsEl) gameBillsEl.textContent = user.bills;
-  if (gameCoinsEl) gameCoinsEl.textContent = user.coins;
-}
+document.querySelectorAll('[data-modal]').forEach(btn => btn.addEventListener('click', () => openModal(btn.dataset.modal)));
+document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
 
 function renderDaily() {
   const grid = document.getElementById('daily-grid');
@@ -211,9 +147,18 @@ function renderDaily() {
     cell.innerHTML = `<div class="d-num">${i + 1}</div><div class="d-icon">${r.icon}</div><div>${r.text}</div>`;
     grid.appendChild(cell);
   });
-  const claimBtn = document.getElementById('daily-claim');
-  if (claimBtn) claimBtn.disabled = !canClaim;
+  document.getElementById('daily-claim').disabled = !canClaim;
 }
+
+document.getElementById('daily-claim').addEventListener('click', async () => {
+  const res = await fetch('/api/dailyreward/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid })
+  });
+  const data = await res.json();
+  if (data.ok) { user = { ...user, ...data.user }; renderMenu(); renderDaily(); }
+});
 
 async function renderLeaderboard() {
   const list = document.getElementById('leaderboard-list');
@@ -267,194 +212,57 @@ function renderMarkers() {
 
 function renderProfile() {
   const input = document.getElementById('profile-name-input');
-  if (!input) return;
   input.value = user.name;
-  
-  const currentAvatarEl = document.getElementById('profile-current-avatar');
-  if (currentAvatarEl) currentAvatarEl.textContent = AVATARS[user.avatar];
-  
+  document.getElementById('profile-current-avatar').textContent = AVATARS[user.avatar];
   const grid = document.getElementById('avatar-grid');
   if (!grid) return;
   grid.innerHTML = '';
   let picked = user.avatar;
-  
   AVATARS.forEach((emoji, i) => {
     const cell = document.createElement('div');
     cell.className = 'avatar-cell' + (i === picked ? ' selected' : '');
     cell.textContent = emoji;
     cell.addEventListener('click', () => { 
       picked = i; 
-      if (currentAvatarEl) currentAvatarEl.textContent = emoji;
+      document.querySelectorAll('.avatar-cell').forEach(c => c.classList.remove('selected'));
+      cell.classList.add('selected');
+      document.getElementById('profile-current-avatar').textContent = emoji; 
     });
     grid.appendChild(cell);
   });
-  
-  const saveProfileBtn = document.getElementById('profile-save');
-  if (saveProfileBtn) {
-    saveProfileBtn.onclick = () => {
-      if (!input.value.trim()) return alert('Ник не пустой!');
-      saveUser({ name: input.value.trim(), avatar: picked });
-      closeModal('profile');
-    };
-  }
+  document.getElementById('profile-save').onclick = () => {
+    if (!input.value.trim()) return alert('Ник не пустой!');
+    saveUser({ name: input.value.trim(), avatar: picked });
+    closeModal('profile');
+  };
 }
 
-// ==========================================
-// 6. ИГРОВАЯ ЛОГИКА И ГЕНЕРАЦИЯ БИЛЕТОВ
-// ==========================================
 function generateTicket() {
   const ranges = [];
-  for (let c = 0; c < 9; c++) ranges.push({ start: c === 0 ? 1 : c * 10, end: c === 8 ? 90 : c * 10 + 9 });
+  for (let c = 0; c < 9; c++) {
+    ranges.push({ start: c === 0 ? 1 : c * 10, end: c === 8 ? 90 : c * 10 + 9 });
+  }
+  
+  const rowCap = [5, 5, 5];
   const counts = new Array(9).fill(1);
   let remaining = 15 - 9;
-  while (remaining > 0) { const idx = Math.floor(Math.random() * 9); if (counts[idx] < 3) { counts[idx]++; remaining--; } }
   
-  const rowCap = [5, 5, 5]; 
+  while (remaining > 0) { 
+    const idx = Math.floor(Math.random() * 9); 
+    if (counts[idx] < 3) { counts[idx]++; remaining--; } 
+  }
+  
   const colRows = [];
   for (let c = 0; c < 9; c++) {
     let avail = [0, 1, 2].filter(r => rowCap[r] > 0).sort(() => Math.random() - 0.5);
     const chosen = avail.slice(0, Math.min(counts[c], avail.length));
-    chosen.forEach(r => rowCap[r]--); colRows.push(chosen);
+    chosen.forEach(r => rowCap[r]--); 
+    colRows.push(chosen);
   }
+  
   if (colRows.reduce((s, a) => s + a.length, 0) !== 15) return generateTicket();
+  
   const grid = [new Array(9).fill(null), new Array(9).fill(null), new Array(9).fill(null)];
   for (let c = 0; c < 9; c++) {
-    const pool = []; for (let n = ranges[c].start; n <= ranges[c].end; n++) pool.push(n);
-    const nums = pool.sort(() => Math.random() - 0.5).slice(0, counts[c]).sort((a, b) => a - b);
-    colRows[c].sort((a, b) => a - b).forEach((r, i) => { grid[r][c] = nums[i]; });
-  }
-  return grid;
-}
-
-function checkWinCondition(mode, tickets, marks) {
-  if (mode === 'A') {
-    return tickets.some((t, ti) => {
-      for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 9; c++) {
-          if (t[r][c] !== null && !marks[ti][r][c]) return false;
-        }
-      }
-      return true;
-    });
-  }
-  if (mode === 'B') {
-    for (let ti = 0; ti < tickets.length; ti++) {
-      for (let r = 0; r < 3; r++) {
-        let rowWin = true;
-        for (let c = 0; c < 9; c++) {
-          if (tickets[ti][r][c] !== null && !marks[ti][r][c]) { rowWin = false; break; }
-        }
-        if (rowWin) return true;
-      }
-    }
-    return false;
-  }
-  if (mode === 'C') {
-    for (let ti = 0; ti < tickets.length; ti++) {
-      let bottomWin = true;
-      for (let c = 0; c < 9; c++) {
-        if (tickets[ti][2][c] !== null && !marks[ti][2][c]) { bottomWin = false; break; }
-      }
-      if (bottomWin) return true;
-    }
-    return false;
-  }
-  return false;
-}
-
-function animateDrum() {
-  let drumEl = document.getElementById('drum');
-  if(!drumEl) return;
-  drumEl.style.animation = 'none';
-  drumEl.offsetHeight; 
-  drumEl.style.animation = 'popDrum 0.4s ease-out';
-}
-
-function startGame(mode, numCards) {
-  document.getElementById('screen-menu').classList.remove('active');
-  document.getElementById('screen-game').classList.add('active');
-  const chatContainer = document.getElementById('room-chat-container');
-  if (chatContainer) chatContainer.classList.add('hidden');
-  
-  renderGameCurrency();
-  
-  const pAvatar = document.getElementById('game-player-avatar');
-  const pName = document.getElementById('game-player-name');
-  if (pAvatar) pAvatar.textContent = AVATARS[user.avatar];
-  if (pName) pName.textContent = user.name;
-  
-  const tickets = []; const marks = [];
-  for (let i = 0; i < numCards; i++) {
-    tickets.push(generateTicket());
-    marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false)));
-  }
-  
-  gameState = { mode, tickets, marks, bots: [], drawn: [], currentNumber: null, finished: false, timer: null };
-  renderTickets();
-  
-  gameState.timer = setInterval(() => {
-    if (gameState.drawn.length >= 90) return clearInterval(gameState.timer);
-    let n; do { n = Math.floor(1 + Math.random() * 90); } while (gameState.drawn.includes(n));
-    gameState.drawn.push(n);
-    gameState.currentNumber = n;
-    
-    const drumNumEl = document.getElementById('drum-number');
-    const drumNickEl = document.getElementById('drum-nickname');
-    if (drumNumEl) drumNumEl.textContent = n;
-    if (drumNickEl) drumNickEl.textContent = NICKNAMES[n] ? `${NICKNAMES[n]}` : '';
-    
-    animateDrum();
-    speakBall(n);
-    renderTickets();
-    
-    if (checkWinCondition(gameState.mode, gameState.tickets, gameState.marks)) {
-      clearInterval(gameState.timer);
-      if (window.confetti) confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
-      alert(gameState.mode === 'B' ? "🎉 Короткое лото! Вы первыми закрыли строчку!" : (gameState.mode === 'C' ? "🎉 Три на три! Нижняя строка закрыта!" : "Вы победили!"));
-    }
-  }, DRAW_INTERVAL);
-}
-
-function renderTickets() {
-  const container = document.getElementById('tickets-container');
-  if (!container) return;
-  container.innerHTML = '';
-  const markerColor = MARKERS.find(m => m.id === user.marker).color;
-  
-  gameState.tickets.forEach((ticket, ti) => {
-    const table = document.createElement('table');
-    table.className = 'ticket';
-    ticket.forEach((row, ri) => {
-      const tr = document.createElement('tr');
-      row.forEach((val, ci) => {
-        const td = document.createElement('td');
-        if (val === null) {
-          td.className = 'empty';
-        } else {
-          td.textContent = val;
-          
-          if (user.isVip && gameState.drawn.includes(val) && !gameState.marks[ti][ri][ci]) {
-            gameState.marks[ti][ri][ci] = true;
-          }
-          
-          if (gameState.marks[ti][ri][ci]) { 
-            td.classList.add('marked');
-            td.style.background = markerColor;
-          } else if (gameState.drawn.includes(val)) {
-            td.classList.add('drawn-not-marked');
-          }
-          
-          td.addEventListener('click', () => {
-            if (gameState.drawn.includes(val) && !gameState.marks[ti][ri][ci]) {
-              gameState.marks[ti][ri][ci] = true;
-              renderTickets();
-            }
-          });
-        }
-        tr.appendChild(td);
-      });
-      table.appendChild(tr);
-    });
-    container.appendChild(table);
-  });
-}
+    const pool = []; 
+for (let n = ranges[c].start; n <= ranges[c].end; n++) pool.push(n);const nums = pool.sort(() => Math.random() - 0.5).slice(0, counts[c]).sort((a, b) => a - b);colRows[c].sort((a, b) => a - b).forEach((r, i) => { grid[r][c] = nums[i]; });}return grid;}function checkWinCondition(mode, tickets, marks) {if (mode === 'A') {return tickets.some((t, ti) => {let totalTicketNumbers = 0;let matchedTicketNumbers = 0;for (let r = 0; r < 3; r++) {for (let c = 0; c < 9; c++) {if (t[r][c] !== null) {totalTicketNumbers++;if (marks[ti][r][c]) matchedTicketNumbers++;}}}return totalTicketNumbers > 0 && totalTicketNumbers === matchedTicketNumbers;});}if (mode === 'B') {for (let ti = 0; ti < tickets.length; ti++) {for (let r = 0; r < 3; r++) {let rowWin = true;let hasNumbers = false;for (let c = 0; c < 9; c++) {if (tickets[ti][r][c] !== null) {hasNumbers = true;if (!marks[ti][r][c]) { rowWin = false; break; }}}if (hasNumbers && rowWin) return true;}}return false;}if (mode === 'C') {for (let ti = 0; ti < tickets.length; ti++) {let bottomRowWin = true;let hasNumbers = false;for (let c = 0; c < 9; c++) {if (tickets[ti][2][c] !== null) {hasNumbers = true;if (!marks[ti][2][c]) { bottomRowWin = false; break; }}}if (hasNumbers && bottomRowWin) return true;}return false;}return false;}function triggerWinEffects(msg) {if (typeof confetti === 'function') {confetti({ particleCount: 150, spread: 85, origin: { y: 0.6 } });}setTimeout(() => { alert(msg); }, 500);}function updateHistoryUI() {const historyEl = document.getElementById('history-numbers');if (!historyEl || !gameState) return;const lastFive = gameState.drawn.slice(-5).reverse();historyEl.innerHTML = lastFive.map(n => `<span class="history-item">${n}</span>`).join(' ');}function startGame(mode, numCards) {document.getElementById('screen-menu').classList.remove('active');document.getElementById('screen-game').classList.add('active');document.getElementById('room-chat-container').classList.add('hidden');renderGameCurrency();document.getElementById('game-player-avatar').textContent = AVATARS[user.avatar];document.getElementById('game-player-name').textContent = user.name;const tickets = []; const marks = [];for (let i = 0; i < numCards; i++) {tickets.push(generateTicket());marks.push(Array.from({ length: 3 }, () => new Array(9).fill(false)));}gameState = { mode, tickets, marks, bots: [], drawn: [], currentNumber: null, finished: false, timer: null };renderTickets();gameState.timer = setInterval(() => {if (gameState.drawn.length >= 90) return clearInterval(gameState.timer);let n; do { n = Math.floor(1 + Math.random() * 90); } while (gameState.drawn.includes(n));gameState.drawn.push(n); gameState.currentNumber = n;const drumEl = document.getElementById('drum-number');drumEl.textContent = n;drumEl.style.animation = 'none';drumEl.offsetHeight;drumEl.style.animation = 'popDrum 0.4s ease-out';document.getElementById('drum-nickname').textContent = NICKNAMES[n] ? `${NICKNAMES[n]}` : '';speakDrumNumber(n);updateHistoryUI();renderTickets();if (checkWinCondition(gameState.mode, gameState.tickets, gameState.marks)) {clearInterval(gameState.timer);let winText = "Вы победили!";if(gameState.mode === 'B') winText = "🎉 Короткое Лото! Вы первыми закрыли строчку!";if(gameState.mode === 'C') winText = "🎉 Три на Три! Закрыта нижняя строчка карточки!";triggerWinEffects(winText);}}, DRAW_INTERVAL);}function renderTickets() {const container = document.getElementById('tickets-container'); container.innerHTML = '';const markerColor = MARKERS.find(m => m.id === user.marker).color;gameState.tickets.forEach((ticket, ti) => {const table = document.createElement('table'); table.className = 'ticket';ticket.forEach((row, ri) => {const tr = document.createElement('tr');row.forEach((val, ci) => {const td = document.createElement('td');if (val === null) td.className = 'empty';else {td.textContent = val;if (gameState.drawn.includes(val) && user.isVip) {gameState.marks[ti][ri][ci] = true;}if (gameState.marks[ti][ri][ci]) {td.classList.add('marked');td.style.background = markerColor;}else if (gameState.drawn.includes(val)) td.classList.add('drawn-not-marked');td.addEventListener('click', () => {if (!gameState.drawn.includes(val) || gameState.marks[ti][ri][ci]) return;gameState.marks[ti][ri][ci] = true; renderTickets();});}tr.appendChild(td);});table.appendChild(tr);});container.appendChild(table);});}document.getElementById('btn-open-multiplayer').addEventListener('click', () => {document.getElementById('modal-multiplayer').classList.remove('hidden');document.getElementById('multi-create-block').classList.remove('hidden');document.getElementById('multi-join-block').classList.remove('hidden');document.getElementById('multi-waiting-block').classList.add('hidden');});document.getElementById('btn-close-multiplayer').addEventListener('click', () => {document.getElementById('modal-multiplayer').classList.add('hidden');if (multiSyncInterval) clearInterval(multiSyncInterval);});document.getElementById('btn-multi-create').addEventListener('click', async () => {if (multiSyncInterval) clearInterval(multiSyncInterval);const maxPlayers = document.getElementById('multi-max-players').value;const stake = document.getElementById('multi-stake').value;const selectedMode = document.querySelector('input[name="game-mode"]:checked').value;const res = await fetch('/api/room/create', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ uid, maxPlayers, stake, mode: selectedMode })});const data = await res.json();if (data.error) return alert(data.error);user.bills = data.userBalance; renderMenu();startWaiting(data.roomId);});document.getElementById('btn-multi-join').addEventListener('click', async () => {if (multiSyncInterval) clearInterval(multiSyncInterval);const roomId = document.getElementById('multi-room-id').value.trim();const res = await fetch('/api/room/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, roomId }) });const data = await res.json();if (data.error) return alert(data.error);if (data.userBalance) { user.bills = data.userBalance; renderMenu(); }startWaiting(roomId);});function startWaiting(roomId) {currentRoomId = roomId;document.getElementById('multi-create-block').classList.add('hidden');document.getElementById('multi-join-block').classList.add('hidden');document.getElementById('multi-waiting-block').classList.remove('hidden');document.getElementById('txt-table-code').textContent = roomId;multiSyncInterval = setInterval(syncRoom, 1000);}async function syncRoom() {const res = await fetch(`/api/room/sync?roomId=${currentRoomId}`);if (!res.ok) return clearInterval(multiSyncInterval);const room = await res.json();document.getElementById('multi-players-list').innerHTML = room.players.map(p => `<div>🧑‍💻 ${p.name}</div>`).join('');if (room.status === 'playing') {clearInterval(multiSyncInterval);document.getElementById('modal-multiplayer').classList.add('hidden');startMultiGame(room);}}function startMultiGame(room) {document.getElementById('screen-menu').classList.remove('active');document.getElementById('screen-game').classList.add('active');document.getElementById('room-chat-container').classList.remove('hidden');gameState = {mode: room.mode || 'A',tickets: [generateTicket(), generateTicket(), generateTicket()],marks: [[new Array(9).fill(false), new Array(9).fill(false), new Array(9).fill(false)],[new Array(9).fill(false), new Array(9).fill(false), new Array(9).fill(false)],[new Array(9).fill(false), new Array(9).fill(false), new Array(9).fill(false)]],drawn: [],bank: room.bank};renderTickets();multiSyncInterval = setInterval(async () => {const res = await fetch(`/api/room/sync?roomId=${currentRoomId}`);if (!res.ok) return;const rState = await res.json();if (rState.drawn.length !== gameState.drawn.length) {gameState.drawn = rState.drawn;let last = gameState.drawn[gameState.drawn.length-1];document.getElementById('drum-number').textContent = last || '-';if (last) {speakDrumNumber(last);document.getElementById('drum-nickname').textContent = NICKNAMES[last] ? `${NICKNAMES[last]}` : '';}updateHistoryUI();renderTickets();}if (rState.chat) {document.getElementById('room-chat-messages').innerHTML = rState.chat.map(m => `<div><b>${m.name}:</b> ${m.text}</div>`).join('');}if (checkWinCondition(gameState.mode, gameState.tickets, gameState.marks)) {clearInterval(multiSyncInterval);saveUser({ bills: user.bills + gameState.bank });triggerWinEffects("🎉 Вы выиграли стол и забрали весь банк!");setTimeout(() => { location.reload(); }, 2000);}if (rState.status === 'finished') {clearInterval(multiSyncInterval);alert("Игра завершена!");location.reload();}}, 1500);}document.getElementById('btn-open-global-chat').addEventListener('click', () => {document.getElementById('modal-global-chat').classList.remove('hidden');updateGlobalChat();});document.getElementById('btn-close-global-chat').addEventListener('click', () => {document.getElementById('modal-global-chat').classList.add('hidden');});document.getElementById('btn-room-chat-send').addEventListener('click', async () => {const input = document.getElementById('room-chat-input');if(!input.value.trim()) return;await fetch('/api/chat/room/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, roomId: currentRoomId, text: input.value.trim() }) });input.value = '';});document.getElementById('btn-global-chat-send').addEventListener('click', async () => {const input = document.getElementById('global-chat-input');if(!input.value.trim()) return;await fetch('/api/chat/global/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, text: input.value.trim() }) });input.value = '';updateGlobalChat();});async function updateGlobalChat() {if (document.getElementById('modal-global-chat').classList.contains('hidden')) return;const res = await fetch('/api/chat/global');const messages = await res.json();const chatBox = document.getElementById('global-chat-messages');chatBox.innerHTML = messages.map(m => `<div><b>${m.name}:</b> ${m.text}</div>`).join('');chatBox.scrollTop = chatBox.scrollHeight;}setInterval(updateGlobalChat, 2000);document.getElementById('btn-admin-login').addEventListener('click', () => document.getElementById('modal-admin').classList.remove('hidden'));document.getElementById('btn-close-admin').addEventListener('click', () => document.getElementById('modal-admin').classList.add('hidden'));document.getElementById('btn-admin-auth').addEventListener('click', async () => {currentAdminPassword = document.getElementById('admin-password-input').value;await refreshAdminPanel();});async function refreshAdminPanel() {const res = await fetch('/api/admin/players', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ adminPassword: currentAdminPassword })});if(!res.ok) return alert("Пароль неверный!");document.getElementById('admin-auth-block').classList.add('hidden');document.getElementById('admin-panel-block').classList.remove('hidden');const players = await res.json();document.getElementById('admin-players-list').innerHTML = players.map(p => `<div>${p.name} ${p.isVip ? '👑 VIP' : ''} ${p.isBanned ? '🛑 ЗАБАНЕН' : ''} Баланс: ${p.bills}💵 | ${p.coins}🪙</div>`).join('');}function showGiftNotifications(gifts) {playNotificationSound();let b = 0; let c = 0; let messages = [];gifts.forEach(g => {b += g.bills || 0;c += g.coins || 0;if (g.message) messages.push(g.message);});const modal = document.getElementById('modal-gift-alert');const billsText = document.getElementById('gift-alert-bills');const coinsText = document.getElementById('gift-alert-coins');if (messages.length > 0) {document.getElementById('gift-icon').textContent = "💬";document.getElementById('gift-title').textContent = "Сообщение от Админа";document.getElementById('gift-sender').innerHTML = messages.map(m => `• ${m}`).join('');} else {document.getElementById('gift-icon').textContent = "🎁";document.getElementById('gift-title').textContent = "Вам подарок!";document.getElementById('gift-sender').innerHTML = "Получено от: SANI GROUP";}billsText.textContent = b > 0 ? `+${b} 💵` : '';coinsText.textContent = c > 0 ? `+${c} 🪙` : '';modal.classList.remove('hidden');document.getElementById('btn-close-gift-alert').onclick = async () => {modal.classList.add('hidden');await fetch('/api/state', {method: 'POST',headers: { 'Content-Type': 'application/json' },body: JSON.stringify({ uid, pendingGifts: [] })});location.reload();};}document.getElementById('btn-play').addEventListener('click', () => openModal('setup'));document.getElementById('setup-start').addEventListener('click', () => {closeModal('setup');const selectedMode = document.querySelector('input[name="game-mode"]:checked').value;startGame(selectedMode, 3);});document.getElementById('btn-exit-game').addEventListener('click', () => location.reload());document.getElementById('btn-sound').addEventListener('click', (e) => {soundOn = !soundOn;e.target.textContent = soundOn ? '🔊' : '🔇';});loadUser();setInterval(loadUser, 5000);
