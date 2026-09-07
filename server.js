@@ -219,6 +219,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Админские действия: отдельные деньги, монеты, VIP, бан и SMS.
+  if (pathname === '/api/admin/clear-database' && req.method === 'POST') {
+    const { adminPassword } = await readBody(req);
+    if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+      return sendJSON(res, 401, { error: 'Wrong password' });
+    }
+    const emptyDB = { users: {}, leaderboard: [] };
+    saveDB(emptyDB);
+    for (const key of Object.keys(rooms)) delete rooms[key];
+    globalChat = [];
+    return sendJSON(res, 200, { ok: true, message: 'База игроков полностью очищена' });
+  }
+
   if (pathname === '/api/admin/action' && req.method === 'POST') {
     const body = await readBody(req);
     const { adminPassword, action, uid, amount, message } = body;

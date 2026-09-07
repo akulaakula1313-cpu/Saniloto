@@ -388,6 +388,25 @@ document.getElementById('btn-admin-action-confirm').addEventListener('click', as
 });
 
 document.getElementById('admin-refresh').addEventListener('click', refreshAdminPanel);
+document.getElementById('admin-clear-database').addEventListener('click', async () => {
+  const first = confirm('⚠️ ОЧИСТИТЬ ВСЮ БАЗУ?\n\nБудут удалены ВСЕ игроки, балансы, VIP, сообщения и активные столы.\n\nЭто действие нельзя отменить.');
+  if (!first) return;
+  const second = prompt('Для подтверждения напишите: УДАЛИТЬ');
+  if (second !== 'УДАЛИТЬ') {
+    alert('Очистка отменена.');
+    return;
+  }
+  const res = await fetch('/api/admin/clear-database', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminPassword: currentAdminPassword })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return alert(data.error || 'Не удалось очистить базу');
+  alert('✅ База игроков полностью очищена.');
+  refreshAdminPanel();
+});
+
 
 async function refreshAdminPanel() {
   const res = await fetch('/api/admin/players', {

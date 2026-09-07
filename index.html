@@ -222,8 +222,12 @@
         <div id="admin-panel-block" class="hidden admin-panel">
           <div class="admin-toolbar">
             <div class="admin-toolbar-title">Игроки</div>
-            <button class="admin-refresh" id="admin-refresh">↻ Обновить</button>
+            <div class="admin-toolbar-actions">
+              <button class="admin-refresh" id="admin-refresh">↻ Обновить</button>
+              <button class="admin-danger-btn" id="admin-clear-database">🗑 ОЧИСТИТЬ БАЗУ</button>
+            </div>
           </div>
+          <div class="admin-danger-note">⚠️ Полностью удаляет всех игроков, их балансы, VIP, сообщения и активные столы.</div>
           <div id="admin-players-list"></div>
         </div>
       </div>
