@@ -33,7 +33,7 @@
     </div>
 
     <div style="position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); display: flex; gap: 20px; width: 90%; max-width: 600px; justify-content: center; z-index: 10;">
-      <button id="btn-play" class="btn" style="font-size: 20px; padding: 14px 30px; flex: 1; white-space: nowrap;">Играть с ботами</button>
+      <button id="btn-play" class="btn" style="font-size: 20px; padding: 14px 30px; flex: 1; white-space: nowrap;">Играть</button>
       <button id="btn-open-multiplayer" class="btn" style="font-size: 20px; padding: 14px 30px; flex: 1; white-space: nowrap; background: linear-gradient(#2ecc71, #27ae60); border-color:#219653;">👥 Стол друзей</button>
     </div>
 
@@ -119,81 +119,10 @@
     </div>
   </div>
 
-  <!-- ===== ЕЖЕДНЕВНЫЕ НАГРАДЫ ===== -->
-  <div id="modal-daily" class="modal hidden">
-    <div class="modal-box">
-      <h2>🎁 Ежедневные награды</h2>
-      <div class="daily-grid" id="daily-grid"></div>
-      <div class="modal-actions"><button class="btn" id="btn-close-daily">Закрыть</button></div>
-    </div>
-  </div>
-
-  <!-- ===== ЛИДЕРБОРД ===== -->
-  <div id="modal-leaderboard" class="modal hidden">
-    <div class="modal-box">
-      <h2>🏆 Топ 50</h2>
-      <div class="leaderboard-list" id="leaderboard-list"></div>
-      <div class="modal-actions"><button class="btn" id="btn-close-leaderboard">Закрыть</button></div>
-    </div>
-  </div>
-
-  <!-- ===== МАГАЗИН ===== -->
-  <div id="modal-shop" class="modal hidden">
-    <div class="modal-box">
-      <h2>🛒 Магазин</h2>
-      <div class="shop-list" id="shop-list"></div>
-      <button class="btn ad-btn" id="btn-watch-ad">📺 Реклама (+20 🪙)</button>
-      <div class="modal-actions"><button class="btn" id="btn-close-shop">Закрыть</button></div>
-    </div>
-  </div>
-
-  <!-- ===== МАРКЕР ===== -->
-  <div id="modal-marker" class="modal hidden">
-    <div class="modal-box">
-      <h2>🖊️ Маркер</h2>
-      <div class="marker-grid" id="marker-grid"></div>
-      <div class="modal-actions"><button class="btn" id="btn-close-marker">Закрыть</button></div>
-    </div>
-  </div>
-
-  <!-- ===== ПРОФИЛЬ ===== -->
-  <div id="modal-profile" class="modal hidden">
-    <div class="modal-box">
-      <h2>👤 Профиль</h2>
-      <div class="avatar-emoji big" id="profile-avatar-preview">🧑‍🦲</div>
-      <div class="avatar-grid" id="profile-avatar-grid"></div>
-      <input type="text" id="profile-name-input" placeholder="Ваше имя" maxlength="18" style="padding:8px; border-radius:6px; border:none; color:#000; width: 80%; margin-top:10px;">
-      <div class="modal-actions">
-        <button class="btn" id="btn-profile-save">Сохранить</button>
-        <button class="btn" id="btn-close-profile">✖</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== ПРАВИЛА ===== -->
-  <div id="modal-rules" class="modal hidden">
-    <div class="modal-box">
-      <h2>📖 Правила игры</h2>
-      <div class="rules-text">
-        <p>Числа вытягиваются автоматически. Нажмите на клетку карточки, чтобы закрыть её.</p>
-        <p>Соберите полную линию или всю карточку раньше других, чтобы выиграть.</p>
-        <p>Используйте усилители (👁 +5 +1 ✖) за игровые монеты 🪙, чтобы получить преимущество.</p>
-      </div>
-      <p style="font-size:12px; opacity:.7; margin-top:20px;">⚙️ РАЗРАБОТЧИК ИГРЫ: SANI GROUP<br>Все права защищены © 2026</p>
-      <div class="modal-actions"><button class="btn" id="btn-close-rules">ОК</button></div>
-    </div>
-  </div>
-
   <!-- ===== ЭКРАН ИГРЫ ===== -->
   <section id="screen-game" class="screen">
     <div class="game-top">
       <button id="btn-exit-game" class="icon-btn">✖</button>
-      <div class="powerups">
-        <button class="pbtn" id="pu-eye">👁<span>10🪙</span></button>
-        <button class="pbtn" id="pu-plus5">+5<span>50🪙</span></button>
-        <button class="pbtn" id="pu-plus1">+1<span>1🪙</span></button>
-        <button class="pbtn" id="pu-x">✖<span>30🪙</span></button>
-      </div>
       <div class="currency-box small">
         <div class="currency"><span id="game-cur-bills">0</span> 💵</div>
         <div class="currency"><span id="game-cur-coins">0</span> 🪙</div>
@@ -210,11 +139,9 @@
         <div class="drum" id="drum-number">-</div>
         <div class="drum-nickname" id="drum-nickname"></div>
       </div>
-      <div class="bots-row" id="bots-row"></div>
     </div>
 
     <div class="event-log" id="event-log"></div>
-    <div class="history" id="history-row"></div>
     <div id="tickets-container"></div>
 
     <div id="room-chat-container" class="hidden" style="margin: 15px auto; max-width: 500px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px; border: 2px solid #c96a00;">
@@ -231,22 +158,71 @@
     <div class="modal-box wide">
       <h2>Настройка игры</h2>
       <h3>Режим игры</h3>
-      <div class="setup-options" id="setup-mode">
-        <label class="setup-option"><input type="radio" name="mode" value="A" checked> <b>А. Простое лото</b> (1-90)</label>
-        <label class="setup-option"><input type="radio" name="mode" value="B"> <b>Б. Короткое лото</b> (1-36)</label>
-        <label class="setup-option"><input type="radio" name="mode" value="C"> <b>В. Три на три</b> (1-9)</label>
+      <div style="margin-bottom: 20px;">
+        <label><input type="radio" name="mode" value="A" checked> <b>А. Простое лото</b></label>
       </div>
-      <h3>Количество карточек</h3>
-      <div class="setup-options row" id="setup-count">
-        <label class="setup-option small"><input type="radio" name="count" value="1" checked> 1</label>
-        <label class="setup-option small"><input type="radio" name="count" value="2"> 2</label>
-        <label class="setup-option small"><input type="radio" name="count" value="3"> 3</label>
-      </div>
-      <p style="font-size:12px; opacity:.7;">Используйте код с осторожностью.</p>
-      <div class="modal-actions">
-        <button class="btn" id="btn-setup-start">Начать</button>
-        <button class="btn" id="btn-close-setup">✖</button>
-      </div>
+      <button id="setup-start" class="btn">Начать</button>
+      <div class="modal-actions"><button class="btn" onclick="document.getElementById('modal-setup').classList.add('hidden')">Закрыть</button></div>
+    </div>
+  </div>
+
+  <!-- ===== ЕЖЕДНЕВНЫЕ НАГРАДЫ ===== -->
+  <div id="modal-daily" class="modal hidden">
+    <div class="modal-box">
+      <h2>Ежедневные награды</h2>
+      <div id="daily-grid" class="daily-grid"></div><br>
+      <button id="daily-claim" class="btn">Забрать награду</button>
+      <div class="modal-actions"><button class="btn" onclick="document.getElementById('modal-daily').classList.add('hidden')">Закрыть</button></div>
+    </div>
+  </div>
+
+  <!-- ===== ЛИДЕРБОРД ===== -->
+  <div id="modal-leaderboard" class="modal hidden">
+    <div class="modal-box">
+      <h2>Топ 50 игроков</h2>
+      <div id="leaderboard-list" style="max-height: 300px; overflow-y: auto; text-align: left;"></div>
+      <div class="modal-actions"><button class="btn" onclick="document.getElementById('modal-leaderboard').classList.add('hidden')">Закрыть</button></div>
+    </div>
+  </div>
+
+  <!-- ===== МАГАЗИН ===== -->
+  <div id="modal-shop" class="modal hidden">
+    <div class="modal-box">
+      <h2>Магазин монет</h2>
+      <div id="shop-list"></div>
+      <div class="modal-actions"><button class="btn" onclick="document.getElementById('modal-shop').classList.add('hidden')">Закрыть</button></div>
+    </div>
+  </div>
+
+  <!-- ===== МАРКЕРЫ ===== -->
+  <div id="modal-marker" class="modal hidden">
+    <div class="modal-box">
+      <h2>Выберите маркер</h2>
+      <div id="marker-grid" style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;"></div>
+      <div class="modal-actions"><button class="btn" onclick="document.getElementById('modal-marker').classList.add('hidden')">Закрыть</button></div>
+    </div>
+  </div>
+
+  <!-- ===== ПРОФИЛЬ ===== -->
+  <div id="modal-profile" class="modal hidden">
+    <div class="modal-box">
+      <h2>Профиль игрока</h2>
+      <input type="text" id="profile-name-input" style="padding: 6px; color: #000; font-size: 16px;"><br><br>
+      <div id="profile-current-avatar" style="font-size: 50px;">🧑‍🦲</div>
+      <div id="avatar-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 15px 0;"></div>
+      <button id="profile-save" class="btn">Сохранить</button>
+      <div class="modal-actions"><button class="btn" onclick="document.getElementById('modal-profile').classList.add('hidden')">Закрыть</button></div>
+    </div>
+  </div>
+
+  <!-- ===== ПРАВИЛА ===== -->
+  <div id="modal-rules" class="modal hidden">
+    <div class="modal-box">
+      <h2>Правила лото</h2>
+      <p style="text-align: left; font-size: 14px; line-height: 1.6;">
+        Числа вытягиваются автоматически из мешка. Нажмите на клетку карточки, чтобы закрыть её фишкой выбранного цвета, если это число выпало на барабане. Закройте всю карточку для победы!
+      </p>
+      <div class="modal-actions"><button class="btn" onclick="document.getElementById('modal-rules').classList.add('hidden')">ОК</button></div>
     </div>
   </div>
 

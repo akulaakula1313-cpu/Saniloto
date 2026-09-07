@@ -7,7 +7,7 @@ const { URL } = require('url');
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'db.json');
 
-const rooms = {};
+const rooms = {}; 
 let globalChat = [];
 
 const MIME = {
@@ -83,7 +83,7 @@ const server = http.createServer(async (req, res) => {
     const { uid, ...update } = body;
     const db = loadDB();
     if (!uid || !db.users[uid]) return sendJSON(res, 400, { error: 'bad_uid' });
-
+    
     if (db.users[uid].isBanned) {
       return sendJSON(res, 200, { ok: false, user: db.users[uid], banned: true });
     }
@@ -98,7 +98,7 @@ const server = http.createServer(async (req, res) => {
     const list = [];
     Object.values(db.users).forEach(u => {
       if (!u.isBanned) {
-        list.push({ name: u.name, score: u.bills, avatar: u.avatar });
+        list.push({ name: u.name, score: u.bills });
       }
     });
     list.sort((a, b) => b.score - a.score);
@@ -144,7 +144,7 @@ const server = http.createServer(async (req, res) => {
     if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра уже началась!' });
     if (room.players.length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол заполнен!' });
     if (room.players.some(p => p.uid === uid)) return sendJSON(res, 200, { ok: true, room });
-    if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно 💵!' });
+    if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно денег!' });
 
     user.bills -= room.stake;
     room.bank += room.stake;
@@ -228,7 +228,7 @@ const server = http.createServer(async (req, res) => {
     const { adminPassword } = await readBody(req);
     if (adminPassword !== 'admin123') return sendJSON(res, 403, { error: 'Пароль неверный!' });
     const db = loadDB();
-
+    
     Object.keys(db.users).forEach(id => {
       db.users[id].bills = 5000;
       db.users[id].coins = 50;
@@ -277,4 +277,4 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, () => console.log(`Лото Сервер запущен на http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Лото Сервер запущен на http://localhost:\${PORT}`));
