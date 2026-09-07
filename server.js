@@ -226,10 +226,16 @@ const server = http.createServer(async (req, res) => {
   };
   const targetFile = fileMap[pathname];
   if (targetFile) {
-    const fPath = path.join(__dirname, 'generated', targetFile);
-    if (fs.existsSync(fPath)) {
+    // Поддерживаем оба варианта структуры проекта:
+    // файлы в корне (как в GitHub-репозитории) и старую папку generated/.
+    const candidates = [
+      path.join(__dirname, targetFile),
+      path.join(__dirname, 'generated', targetFile)
+    ];
+    const fPath = candidates.find(p => fs.existsSync(p));
+    if (fPath) {
       const ext = path.extname(fPath);
-      res.writeHead(200, { 'Content-Type': MIME[ext] });
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
       return res.end(fs.readFileSync(fPath));
     }
   }
