@@ -25,16 +25,16 @@
       <h1 class="game-title">ЛОТО ОНЛАЙН</h1>
 
       <div class="menu-buttons">
-        <button class="btn" data-modal="daily">📆 Ежедневные награды</button>
-        <button class="btn" data-modal="leaderboard">🏆 Лидерборд</button>
-        <button class="btn" data-modal="shop">🛒 Магазин</button>
-        <button class="btn" data-modal="marker">🖌 Маркер</button>
-        <button class="btn" data-modal="profile">👤 Профиль</button>
-        <button class="btn" data-modal="rules">📖 Правила</button>
+        <button class="btn" data-modal="daily">Ежедневные награды</button>
+        <button class="btn" data-modal="leaderboard">Лидерборд</button>
+        <button class="btn" data-modal="shop">Магазин</button>
+        <button class="btn" data-modal="marker">Маркер</button>
+        <button class="btn" data-modal="profile">Профиль</button>
+        <button class="btn" data-modal="rules">Правила</button>
       </div>
 
       <div style="display:flex; justify-content:center; gap:15px; margin-top:25px;">
-        <button class="btn" id="btn-play">🎮 Играть с ботами</button>
+        <button class="btn" id="btn-play">Играть с ботами</button>
         <button class="btn" id="btn-open-multiplayer">👥 Стол друзей</button>
       </div>
 
@@ -54,7 +54,7 @@
           <div class="currency"><span id="game-cur-bills">0</span> 💵</div>
           <div class="currency"><span id="game-cur-coins">0</span> 🪙</div>
         </div>
-        <button class="btn" id="btn-exit-game" style="background:#c0392b; margin-left:auto;">🚪 Выйти</button>
+        <button class="btn" id="btn-exit-game" style="background:#c0392b; margin-left:auto;">Выйти</button>
       </div>
 
       <div class="drum-row">
@@ -72,7 +72,7 @@
         <div class="chat-messages" id="room-chat-messages"></div>
         <div style="display:flex; gap:5px;">
           <input type="text" id="room-chat-input" placeholder="Сообщение..." style="flex:1; padding:5px; color:#000;">
-          <button class="btn" id="btn-room-chat-send" style="padding:5px 10px;">📤</button>
+          <button class="btn" id="btn-room-chat-send" style="padding:5px 10px;">Отправить</button>
         </div>
       </div>
     </div>
@@ -83,7 +83,7 @@
         <button class="icon-close-modal" data-close="daily">✖</button>
         <h2>📆 Ежедневные награды</h2>
         <div id="daily-grid"></div>
-        <button class="btn" id="daily-claim" style="margin-top:15px;">🎁 Получить награду</button>
+        <button class="btn" id="daily-claim" style="margin-top:15px;">Получить награду</button>
       </div>
     </div>
 
@@ -118,14 +118,14 @@
     <div id="modal-setup" class="modal hidden">
       <div class="modal-box setup-modal-box">
         <button class="icon-close-modal" data-close="setup">✖</button>
-        <h2>⚙️ Настройка игры</h2>
+        <h2>Настройка игры</h2>
         <h3>Режим игры</h3>
         <div class="setup-options" style="text-align:left; margin-bottom:20px; display:flex; flex-direction:column; gap:10px;">
           <label><input type="radio" class="game-mode-radio" name="game-mode" value="A" checked> <b>А. Простое лото</b> (всю карту)</label>
           <label><input type="radio" class="game-mode-radio" name="game-mode" value="B"> <b>Б. Короткое лото</b> (1 любую строку)</label>
           <label><input type="radio" class="game-mode-radio" name="game-mode" value="C"> <b>В. Три на три</b> (выигрыш по нижней строке)</label>
         </div>
-        <button class="btn" id="setup-start">🎯 Начать игру</button>
+        <button class="btn" id="setup-start">Начать игру</button>
       </div>
     </div>
 
@@ -139,20 +139,19 @@
           <h3>Создать новый стол:</h3>
           <label class="multi-field">Мест за столом (2-6)<input type="number" id="multi-max-players" value="2" min="2" max="6"></label>
           <label class="multi-field">Ставка стола (💵)<input type="number" id="multi-stake" value="300" min="1"></label>
-          <button class="btn" id="btn-multi-create">🎲 Получить номер стола</button>
+          <button class="btn" id="btn-multi-create">Получить номер стола</button>
         </div>
         <hr>
         <div id="multi-join-block">
           <h3>Подключиться к другу:</h3>
           <input class="multi-room-code" type="text" id="multi-room-id" placeholder="Код стола">
-          <button class="btn" id="btn-multi-join">🚪 Войти за стол</button>
+          <button class="btn" id="btn-multi-join">Войти за стол</button>
         </div>
 
         <div id="multi-waiting-block" class="hidden">
-          <h1 id="txt-table-code" style="font-size:48px; color:var(--gold);">0000</h1>
-          <p>📤 Передайте этот код друзьям!</p>
+          <h1 id="txt-table-code">0000</h1>
+          <p>Передайте этот код друзьям!</p>
           <div id="multi-players-list" style="margin:15px 0;"></div>
-          <button class="btn" id="btn-leave-room" style="background:#c0392b;">🚪 Выйти из комнаты</button>
         </div>
       </div>
     </div>
@@ -161,11 +160,11 @@
     <div id="modal-global-chat" class="modal hidden">
       <div class="modal-box">
         <button class="icon-close-modal" id="btn-close-global-chat">✖</button>
-        <h3>💬 Общий ЧАТ SANI GROUP</h3>
+        <h3>💬 Общий ЧАТ SANI GROUP (24 часа)</h3>
         <div class="chat-messages" id="global-chat-messages" style="height:250px;"></div>
         <div style="display:flex; gap:5px;">
           <input type="text" id="global-chat-input" placeholder="Текст..." style="flex:1; padding:5px; color:#000;">
-          <button class="btn" id="btn-global-chat-send" style="padding:5px 10px;">📤</button>
+          <button class="btn" id="btn-global-chat-send" style="padding:5px 10px;">Отправить</button>
         </div>
       </div>
     </div>
@@ -180,7 +179,7 @@
           <span id="gift-alert-bills"></span>
           <span id="gift-alert-coins"></span>
         </div>
-        <button class="btn" id="btn-close-gift-alert">❤️ Спасибо!</button>
+        <button class="btn" id="btn-close-gift-alert">Спасибо! ❤</button>
       </div>
     </div>
 
@@ -192,7 +191,7 @@
         <input type="text" id="profile-name-input" style="padding:5px; text-align:center; color:#000;"><br>
         <div id="profile-current-avatar" style="font-size:40px; margin:10px 0;">🧑‍🦲</div>
         <div id="avatar-grid"></div>
-        <button class="btn" id="profile-save">💾 Сохранить</button>
+        <button class="btn" id="profile-save">Сохранить</button>
       </div>
     </div>
 
@@ -200,12 +199,10 @@
     <div id="modal-rules" class="modal hidden">
       <div class="modal-box">
         <button class="icon-close-modal" data-close="rules">✖</button>
-        <h2>📖 Правила игры</h2>
-        <p>🔢 Числа вытягиваются автоматически каждые 4 секунды.</p>
-        <p>✏️ Нажимайте на карточки, чтобы закрывать числа.</p>
+        <h2>Правила игры</h2>
+        <p>Числа вытягиваются автоматически. Нажимайте на карточки, чтобы закрывать числа.</p>
         <hr>
-        <p>⚙️ <b>РАЗРАБОТЧИК ИГРЫ:</b> SANI GROUP</p>
-        <p style="font-size:12px; opacity:0.6;">Версия 2.0</p>
+        ⚙ **РАЗРАБОТЧИК ИГРЫ:** SANI GROUP
       </div>
     </div>
 
@@ -220,12 +217,12 @@
           <div class="admin-lock">🔐</div>
           <p>Введите пароль администратора</p>
           <input type="password" id="admin-password-input" placeholder="Пароль" autocomplete="current-password">
-          <button class="btn admin-login-btn" id="btn-admin-auth">🔑 ВОЙТИ В АДМИНКУ</button>
+          <button class="btn admin-login-btn" id="btn-admin-auth">ВОЙТИ В АДМИНКУ</button>
         </div>
         <div id="admin-panel-block" class="hidden admin-panel">
           <div class="admin-toolbar">
-            <div class="admin-toolbar-title">👥 Игроки</div>
-            <button class="admin-refresh" id="admin-refresh">🔄 Обновить</button>
+            <div class="admin-toolbar-title">Игроки</div>
+            <button class="admin-refresh" id="admin-refresh">↻ Обновить</button>
           </div>
           <div id="admin-players-list"></div>
         </div>
@@ -247,7 +244,7 @@
           <label class="admin-field-label">Текст сообщения</label>
           <textarea id="admin-action-message" maxlength="500" placeholder="Введите сообщение игроку..."></textarea>
         </div>
-        <button class="btn admin-confirm" id="btn-admin-action-confirm">✅ ПОДТВЕРДИТЬ</button>
+        <button class="btn admin-confirm" id="btn-admin-action-confirm">ПОДТВЕРДИТЬ</button>
       </div>
     </div>
 

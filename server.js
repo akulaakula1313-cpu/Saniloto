@@ -7,8 +7,7 @@ const { URL } = require('url');
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'db.json');
 
-const activeSessions = new Map();
-const rooms = {};
+const rooms = {}; 
 let globalChat = [];
 
 const MIME = {
@@ -67,29 +66,15 @@ async function readBody(req) {
   });
 }
 
-function validateUser(uid, db) {
-  if (!uid || !db.users[uid]) return { error: 'Пользователь не найден' };
-  if (db.users[uid].isBanned) return { error: 'banned', message: 'Вы заблокированы администратором!' };
-  return { user: db.users[uid] };
-}
-
-function getSessionId(req) {
-  const cookie = req.headers.cookie || '';
-  const match = cookie.match(/sessionId=([^;]+)/);
-  return match ? match[1] : null;
-}
-
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const { pathname, searchParams } = url;
 
-  if (req.method === 'GET') {
-    const checkUid = searchParams.get('uid');
-    if (checkUid) {
-      const db = loadDB();
-      if (db.users[checkUid] && db.users[checkUid].isBanned) {
-        return sendJSON(res, 403, { error: 'banned', message: 'Вы заблокированы администратором!' });
-      }
+  const checkUid = searchParams.get('uid');
+  if (checkUid) {
+    const db = loadDB();
+    if (db.users[checkUid] && db.users[checkUid].isBanned) {
+      return sendJSON(res, 403, { error: 'banned', message: 'Вы заблокированы администратором!' });
     }
   }
 
@@ -101,47 +86,29 @@ const server = http.createServer(async (req, res) => {
       db.users[uid] = defaultUser(searchParams.get('name'));
       saveDB(db);
     }
-    
-    const sessionId = crypto.randomBytes(16).toString('hex');
-    activeSessions.set(uid, sessionId);
-    
-    res.setHeader('Set-Cookie', `sessionId=${sessionId}; HttpOnly; Path=/; Max-Age=86400`);
-    return sendJSON(res, 200, { 
-      uid, 
-      sessionId,
-      ...db.users[uid] 
-    });
+    return sendJSON(res, 200, { uid, ...db.users[uid] });
   }
 
   if (pathname === '/api/state' && req.method === 'POST') {
     const body = await readBody(req);
-    const { uid, sessionId, ...update } = body;
+    const { uid, ...update } = body;
     const db = loadDB();
-    
     if (!uid || !db.users[uid]) return sendJSON(res, 400, { error: 'bad_uid' });
-    if (activeSessions.get(uid) !== sessionId) return sendJSON(res, 401, { error: 'Неверная сессия' });
     if (db.users[uid].isBanned) return sendJSON(res, 403, { error: 'banned' });
-    
     db.users[uid] = { ...db.users[uid], ...update };
     saveDB(db);
     return sendJSON(res, 200, { ok: true, user: db.users[uid] });
   }
 
   if (pathname === '/api/dailyreward/claim' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { uid, sessionId } = body;
+    const { uid } = await readBody(req);
     const db = loadDB();
-    
-    const validation = validateUser(uid, db);
-    if (validation.error) return sendJSON(res, validation.error === 'banned' ? 403 : 400, { error: validation.error });
-    if (activeSessions.get(uid) !== sessionId) return sendJSON(res, 401, { error: 'Неверная сессия' });
-    
-    const user = validation.user;
+    const user = db.users[uid];
+    if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
     const now = Date.now();
     if (now - user.lastClaim < 24 * 60 * 60 * 1000) {
       return sendJSON(res, 400, { error: 'Награда уже получена сегодня' });
     }
-    
     const rewards = [
       { bills: 500, coins: 0 }, { bills: 1000, coins: 0 }, { bills: 0, coins: 10 },
       { bills: 1500, coins: 0 }, { bills: 0, coins: 30 }, { bills: 3000, coins: 0 }, { bills: 0, coins: 45 }
@@ -164,36 +131,24 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/room/create' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { uid, sessionId, maxPlayers, stake, mode } = body;
+    const { uid, maxPlayers, stake, mode } = await readBody(req);
     const db = loadDB();
-    
-    const validation = validateUser(uid, db);
-    if (validation.error) return sendJSON(res, validation.error === 'banned' ? 403 : 400, { error: validation.error });
-    if (activeSessions.get(uid) !== sessionId) return sendJSON(res, 401, { error: 'Неверная сессия' });
-    
-    const user = validation.user;
-    const stakeNum = parseInt(stake, 10);
-    if (!stakeNum || stakeNum <= 0 || user.bills < stakeNum) {
-      return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
-    }
+    const user = db.users[uid];
+    if (!user || user.bills < stake) return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
 
-    let roomId; 
-    do { roomId = Math.floor(1000 + Math.random() * 9000).toString(); } while (rooms[roomId]);
-    
-    user.bills -= stakeNum;
-    saveDB(db);
+    let roomId; do { roomId = Math.floor(1000 + Math.random() * 9000).toString(); } while (rooms[roomId]);
+    user.bills -= stake; saveDB(db);
 
     rooms[roomId] = {
       id: roomId,
-      stake: stakeNum,
-      maxPlayers: Math.min(6, Math.max(2, parseInt(maxPlayers, 10) || 2)),
+      stake: parseInt(stake, 10),
+      maxPlayers: parseInt(maxPlayers, 10),
       mode: mode || 'A',
       players: [{ uid, name: user.name, avatar: user.avatar }],
       status: 'waiting',
       deck: Array.from({ length: 90 }, (_, i) => i + 1).sort(() => Math.random() - 0.5),
       drawn: [],
-      bank: stakeNum,
+      bank: parseInt(stake, 10),
       lastTick: Date.now(),
       chat: []
     };
@@ -201,42 +156,23 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/room/join' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { uid, sessionId, roomId } = body;
-    const db = loadDB();
-    
-    const validation = validateUser(uid, db);
-    if (validation.error) return sendJSON(res, validation.error === 'banned' ? 403 : 400, { error: validation.error });
-    if (activeSessions.get(uid) !== sessionId) return sendJSON(res, 401, { error: 'Неверная сессия' });
-    
-    const user = validation.user;
-    const room = rooms[roomId];
-    
+    const { uid, roomId } = await readBody(req);
+    const db = loadDB(); const user = db.users[uid]; const room = rooms[roomId];
     if (!room) return sendJSON(res, 404, { error: 'Стол не найден!' });
     if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра уже началась!' });
     if (room.players.length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол заполнен!' });
     if (room.players.some(p => p.uid === uid)) return sendJSON(res, 200, { ok: true, room });
     if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно денег!' });
 
-    user.bills -= room.stake;
-    room.bank += room.stake;
-    saveDB(db);
+    user.bills -= room.stake; room.bank += room.stake; saveDB(db);
     room.players.push({ uid, name: user.name, avatar: user.avatar });
     if (room.players.length === room.maxPlayers) room.status = 'playing';
     return sendJSON(res, 200, { ok: true, room, userBalance: user.bills });
   }
 
   if (pathname === '/api/room/sync' && req.method === 'GET') {
-    const roomId = searchParams.get('roomId');
-    const uid = searchParams.get('uid');
-    const room = rooms[roomId];
-    
+    const roomId = searchParams.get('roomId'); const room = rooms[roomId];
     if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
-    
-    if (uid && !room.players.some(p => p.uid === uid)) {
-      return sendJSON(res, 403, { error: 'Вы не в этой комнате' });
-    }
-    
     if (room.status === 'playing' && Date.now() - room.lastTick >= 4000) {
       if (room.deck.length > 0) {
         const nextNum = room.deck.pop();
@@ -249,88 +185,46 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, room);
   }
 
-  if (pathname === '/api/room/leave' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { uid, sessionId, roomId } = body;
-    const db = loadDB();
-    
-    const validation = validateUser(uid, db);
-    if (validation.error) return sendJSON(res, validation.error === 'banned' ? 403 : 400, { error: validation.error });
-    if (activeSessions.get(uid) !== sessionId) return sendJSON(res, 401, { error: 'Неверная сессия' });
-    
-    const room = rooms[roomId];
-    if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
-    
-    room.players = room.players.filter(p => p.uid !== uid);
-    if (room.players.length === 0) {
-      delete rooms[roomId];
-    }
-    return sendJSON(res, 200, { ok: true });
-  }
-
   if (pathname === '/api/chat/room/send' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { uid, sessionId, roomId, text } = body;
+    const { uid, roomId, text } = await readBody(req);
     const db = loadDB();
-    
-    const validation = validateUser(uid, db);
-    if (validation.error) return sendJSON(res, validation.error === 'banned' ? 403 : 400, { error: validation.error });
-    if (activeSessions.get(uid) !== sessionId) return sendJSON(res, 401, { error: 'Неверная сессия' });
-    
     const room = rooms[roomId];
-    if (!room) return sendJSON(res, 404, { error: 'Комната не найдена' });
-    if (!room.players.some(p => p.uid === uid)) {
-      return sendJSON(res, 403, { error: 'Вы не в этой комнате' });
+    if (room && db.users[uid]) {
+      room.chat.push({ name: db.users[uid].name, text });
+      if (room.chat.length > 20) room.chat.shift();
+      return sendJSON(res, 200, { ok: true });
     }
-    
-    const cleanText = String(text || '').trim().slice(0, 200);
-    if (cleanText) {
-      room.chat.push({ name: db.users[uid].name, text: cleanText, time: Date.now() });
-      if (room.chat.length > 50) room.chat = room.chat.slice(-50);
-    }
-    return sendJSON(res, 200, { ok: true });
+    return sendJSON(res, 400, { error: 'Комната или пользователь не найдены' });
   }
 
   if (pathname === '/api/chat/global' && req.method === 'GET') {
-    return sendJSON(res, 200, globalChat.slice(-30));
+    return sendJSON(res, 200, globalChat);
   }
 
   if (pathname === '/api/chat/global/send' && req.method === 'POST') {
-    const body = await readBody(req);
-    const { uid, sessionId, text } = body;
+    const { uid, text } = await readBody(req);
     const db = loadDB();
-    
-    const validation = validateUser(uid, db);
-    if (validation.error) return sendJSON(res, validation.error === 'banned' ? 403 : 400, { error: validation.error });
-    if (activeSessions.get(uid) !== sessionId) return sendJSON(res, 401, { error: 'Неверная сессия' });
-    
-    const cleanText = String(text || '').trim().slice(0, 200);
-    if (cleanText) {
-      globalChat.push({ name: db.users[uid].name, text: cleanText, time: Date.now() });
-      if (globalChat.length > 50) globalChat = globalChat.slice(-50);
+    if(db.users[uid]) {
+      globalChat.push({ name: db.users[uid].name, text });
+      if(globalChat.length > 30) globalChat.shift();
     }
     return sendJSON(res, 200, { ok: true });
   }
 
   if (pathname === '/api/admin/players' && req.method === 'POST') {
     const { adminPassword } = await readBody(req);
-    const validPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    if (adminPassword !== validPassword) {
-      return sendJSON(res, 401, { error: 'Wrong password' });
-    }
+    if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) return sendJSON(res, 401, { error: 'Wrong password' });
     const db = loadDB();
     return sendJSON(res, 200, Object.entries(db.users).map(([k, v]) => ({ uid: k, ...v })));
   }
 
+  // Админские действия: отдельные деньги, монеты, VIP, бан и SMS.
   if (pathname === '/api/admin/action' && req.method === 'POST') {
     const body = await readBody(req);
     const { adminPassword, action, uid, amount, message } = body;
-    
-    const validPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    if (adminPassword !== validPassword) {
+    if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
       return sendJSON(res, 401, { error: 'Wrong password' });
     }
-    
     const db = loadDB();
     const target = db.users[uid];
     if (!target) return sendJSON(res, 404, { error: 'Игрок не найден' });
@@ -343,38 +237,30 @@ const server = http.createServer(async (req, res) => {
     };
 
     if (action === 'ban') {
-      if (target.isBanned) return sendJSON(res, 400, { error: 'Игрок уже заблокирован' });
       target.isBanned = true;
       pushNotice('system', 'Ваш аккаунт заблокирован администратором.');
     } else if (action === 'unban') {
-      if (!target.isBanned) return sendJSON(res, 400, { error: 'Игрок не заблокирован' });
       target.isBanned = false;
       pushNotice('system', 'Ваш аккаунт разблокирован. Добро пожаловать обратно!');
     } else if (action === 'vip_on') {
-      if (target.isVip) return sendJSON(res, 400, { error: 'Игрок уже VIP' });
       target.isVip = true;
       pushNotice('vip', 'Администратор SANI GROUP подарил вам VIP-статус! 👑');
     } else if (action === 'vip_off') {
-      if (!target.isVip) return sendJSON(res, 400, { error: 'Игрок не VIP' });
       target.isVip = false;
       pushNotice('vip', 'VIP-статус отключён администратором SANI GROUP.');
     } else if (action === 'give_bills') {
-      if (!num || num <= 0) return sendJSON(res, 400, { error: 'Укажите положительное количество денег' });
-      if (num > 1000000) return sendJSON(res, 400, { error: 'Слишком большая сумма' });
+      if (!num) return sendJSON(res, 400, { error: 'Укажите количество денег' });
       target.bills = Math.max(0, (target.bills || 0) + num);
       pushNotice('bills', `Вам начислено ${num} 💵`, { bills: num, coins: 0 });
     } else if (action === 'give_coins') {
-      if (!num || num <= 0) return sendJSON(res, 400, { error: 'Укажите положительное количество монет' });
-      if (num > 100000) return sendJSON(res, 400, { error: 'Слишком много монет' });
+      if (!num) return sendJSON(res, 400, { error: 'Укажите количество монет' });
       target.coins = Math.max(0, (target.coins || 0) + num);
       pushNotice('coins', `Вам начислено ${num} 🪙`, { bills: 0, coins: num });
     } else if (action === 'message') {
       const text = String(message || '').trim().slice(0, 500);
       if (!text) return sendJSON(res, 400, { error: 'Введите сообщение' });
       pushNotice('message', text);
-    } else {
-      return sendJSON(res, 400, { error: 'Неизвестное действие' });
-    }
+    } else return sendJSON(res, 400, { error: 'Неизвестное действие' });
 
     saveDB(db);
     return sendJSON(res, 200, { ok: true, user: { uid, ...target } });
@@ -388,6 +274,8 @@ const server = http.createServer(async (req, res) => {
   };
   const targetFile = fileMap[pathname];
   if (targetFile) {
+    // Поддерживаем оба варианта структуры проекта:
+    // файлы в корне (как в GitHub-репозитории) и старую папку generated/.
     const candidates = [
       path.join(__dirname, targetFile),
       path.join(__dirname, 'generated', targetFile)
@@ -405,6 +293,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`🚀 Сервер работает на порту ${PORT}`);
-  console.log(`🔑 Пароль админа: ${process.env.ADMIN_PASSWORD || 'admin123'}`);
+  console.log(`Сервер работает на порту ${PORT}`);
 });
