@@ -232,6 +232,38 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { ok: true });
   }
 
+
+  if (pathname === '/api/admin/send-message' && req.method === 'POST') {
+    const { adminPassword, targetUid, message } = await readBody(req);
+    if (adminPassword !== 'admin123') return sendJSON(res,403,{error:'bad_password'});
+    const db = loadDB();
+    if (!db.users[targetUid]) return sendJSON(res,404,{error:'player_not_found'});
+    db.users[targetUid].messages = db.users[targetUid].messages || [];
+    db.users[targetUid].messages.push({text:String(message||'').substring(0,200),time:Date.now()});
+    saveDB(db);
+    return sendJSON(res,200,{ok:true});
+  }
+
+  if (pathname === '/api/admin/set-vip' && req.method === 'POST') {
+    const { adminPassword, targetUid, vip } = await readBody(req);
+    if (adminPassword !== 'admin123') return sendJSON(res,403,{error:'bad_password'});
+    const db = loadDB();
+    if (!db.users[targetUid]) return sendJSON(res,404,{error:'player_not_found'});
+    db.users[targetUid].vip = !!vip;
+    saveDB(db);
+    return sendJSON(res,200,{ok:true});
+  }
+
+  if (pathname === '/api/admin/block' && req.method === 'POST') {
+    const { adminPassword, targetUid, blocked } = await readBody(req);
+    if (adminPassword !== 'admin123') return sendJSON(res,403,{error:'bad_password'});
+    const db = loadDB();
+    if (!db.users[targetUid]) return sendJSON(res,404,{error:'player_not_found'});
+    db.users[targetUid].blocked = !!blocked;
+    saveDB(db);
+    return sendJSON(res,200,{ok:true});
+  }
+
   let filePath = pathname === '/' ? '/index.html' : pathname;
   const fullPath = path.join(__dirname, filePath);
   fs.readFile(fullPath, (err, data) => {
