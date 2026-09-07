@@ -16,7 +16,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;ba
 .game-title{font-size:42px;margin:26px 0 28px;color:var(--gold);text-shadow:0 3px 0 #a8430a,0 6px 14px #000;letter-spacing:2px}.game-title:after{content:"✦  SANI GROUP  ✦";display:block;font-size:11px;letter-spacing:4px;color:#fff3bf;opacity:.72;margin-top:7px}
 .menu-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:24px auto;max-width:560px}.menu-buttons .btn{min-height:54px}
 .modal{position:fixed;inset:0;background:radial-gradient(circle,rgba(103,52,18,.18),rgba(0,0,0,.86));backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:50;padding:18px}.modal.hidden{display:none!important}
-.modal-box{background:linear-gradient(145deg,#b96f3f 0%,#7b3f1c 44%,#4a210d 100%);border:4px solid var(--gold);border-radius:25px;padding:25px 27px;max-width:540px;width:min(94vw,540px);max-height:92vh;overflow:auto;position:relative;text-align:center;box-shadow:0 0 0 2px rgba(91,43,7,.8),0 18px 50px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.25),inset 0 0 28px rgba(0,0,0,.42)}
+.modal-box{background:linear-gradient(145deg,#b96f3f 0%,#7b3f1c 44%,#4a210d 100%);border:4px solid var(--gold);border-radius:25px;padding:25px 27px;max-width:540px;width:min(94vw,540px);max-height:92vh;overflow-x:hidden;overflow-y:auto;position:relative;text-align:center;box-shadow:0 0 0 2px rgba(91,43,7,.8),0 18px 50px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.25),inset 0 0 28px rgba(0,0,0,.42)}
 .modal-box:before{content:"";position:absolute;inset:8px;border:1px solid rgba(255,216,77,.22);border-radius:18px;pointer-events:none}.modal-box h2{font-size:27px;color:var(--gold);text-shadow:2px 3px 0 rgba(87,33,0,.9);margin:0 0 16px}.icon-close-modal{position:absolute;right:-11px;top:-11px;background:linear-gradient(#ff7b7b,#e53935);border:2px solid #ffaaaa;box-shadow:0 4px 0 #8f1d1d,0 6px 14px #000;width:39px;height:39px;border-radius:50%;color:#fff;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5}.icon-close-modal:active{transform:translateY(3px);box-shadow:0 1px 0 #8f1d1d}
 input{background:#fff;color:#231006;border:2px solid #e4a63a;border-radius:9px;padding:10px 12px;font:inherit;box-shadow:inset 0 2px 5px rgba(0,0,0,.18)}input:focus{outline:2px solid #ffe37b}
 hr{border:0;height:2px;background:linear-gradient(90deg,transparent,#ffd84d,transparent);margin:18px 0}
@@ -30,3 +30,35 @@ hr{border:0;height:2px;background:linear-gradient(90deg,transparent,#ffd84d,tran
 .admin-modal-box{max-width:680px;padding:24px 20px}.admin-crown{font-size:42px;filter:drop-shadow(0 4px 5px #000);margin-top:-6px}.admin-title{font-size:30px!important;margin-bottom:3px!important}.admin-subtitle{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#ffe8a2;opacity:.8;margin-bottom:18px}.admin-auth{padding:22px 10px 12px}.admin-lock{font-size:42px}.admin-auth p{color:#ffe9b2}.admin-auth input{width:min(100%,280px);display:block;margin:0 auto 14px;text-align:center}.admin-login-btn{min-width:230px}.admin-panel{margin-top:6px;text-align:left}.admin-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.admin-summary span{flex:1;min-width:120px;background:rgba(0,0,0,.28);border:1px solid rgba(255,216,77,.28);border-radius:10px;padding:8px;text-align:center;font-size:12px}.admin-player-card{background:linear-gradient(145deg,rgba(255,255,255,.1),rgba(0,0,0,.28));border:1px solid rgba(255,216,77,.4);border-radius:16px;padding:12px;margin:9px 0;box-shadow:0 5px 14px rgba(0,0,0,.22)}.admin-player-head{display:flex;gap:12px;align-items:center}.admin-player-avatar{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);font-size:30px;border:2px solid #d79b38}.admin-player-name{font-weight:900;font-size:16px}.admin-player-info{flex:1;min-width:0}.admin-player-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:10px;opacity:.8;margin-top:3px}.admin-balances{display:flex;gap:12px;margin-top:5px;color:#ffe9a3;font-weight:900;font-size:13px}.admin-badge{padding:2px 6px;border-radius:999px;font-size:9px;font-weight:900}.admin-badge.success{background:#1f9e5a}.admin-badge.danger{background:#b72c35}.admin-badge.vip{background:linear-gradient(90deg,#9b6510,#e9bd3b);color:#fff}.admin-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}.admin-action-btn{border:1px solid #b77a26;border-radius:9px;padding:8px 5px;background:#3b1b0a;color:#fff;font-weight:900;cursor:pointer;font-size:11px}.admin-action-btn:hover{filter:brightness(1.2);transform:translateY(-1px)}.admin-action-btn.money{border-color:#47c983}.admin-action-btn.message{border-color:#58a8ff}.admin-action-btn.vip{border-color:#ffd84d}.admin-action-btn.ban{border-color:#ff6868}.admin-action-btn.unban{border-color:#69e59d}.gift-message{background:rgba(0,0,0,.2);border-radius:10px;padding:8px;margin:5px 0;color:#fff4cf}
 @media(max-width:600px){#app{padding-left:8px;padding-right:8px}.game-title{font-size:31px}.menu-buttons{grid-template-columns:1fr}.ticket td{width:34px;height:34px;font-size:13px}.drum{width:90px;height:90px;font-size:34px}.admin-actions{grid-template-columns:repeat(2,1fr)}.modal-box{padding:22px 17px}#daily-grid{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:390px){.ticket td{width:29px;height:29px;font-size:12px}.currency{padding:6px 8px;font-size:12px}.avatar-emoji{font-size:34px}}
+
+/* MODAL FIXES */
+.modal-box > * { max-width:100%; }
+.leaderboard-modal-box,.setup-modal-box,.multiplayer-modal-box { width:min(94vw,560px); overflow-x:hidden; }
+.leaderboard-list { width:100%; max-width:100%; overflow-x:hidden; padding:4px 2px; }
+.lb-row { display:grid; grid-template-columns:42px 42px minmax(0,1fr) auto; align-items:center; gap:9px; width:100%; padding:10px 8px; margin:5px 0; border:1px solid rgba(255,216,77,.22); border-radius:12px; background:rgba(0,0,0,.22); }
+.lb-row.me { border-color:var(--gold); box-shadow:0 0 14px rgba(255,216,77,.18); }
+.lb-rank { font-size:18px; font-weight:900; color:var(--gold); text-align:center; }
+.lb-emoji { font-size:25px; text-align:center; }
+.lb-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; font-weight:900; }
+.lb-score { white-space:nowrap; font-weight:900; color:#ffe58a; }
+.setup-options label { padding:10px 12px; border:1px solid rgba(255,216,77,.18); border-radius:12px; background:rgba(0,0,0,.16); }
+.setup-options label:hover { border-color:var(--gold); background:rgba(255,216,77,.08); }
+.multi-field { display:flex; flex-direction:column; gap:7px; margin:12px auto; max-width:300px; font-weight:900; color:#ffe9b2; }
+.multi-field input,.multi-room-code { width:100%; }
+.multi-room-code { max-width:300px; margin:6px auto 14px; text-align:center; }
+.multiplayer-modal-box hr { margin:20px 0; }
+.admin-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+.admin-toolbar-title { font-size:20px; color:var(--gold); font-weight:900; }
+.admin-refresh { background:rgba(255,216,77,.12); border:1px solid rgba(255,216,77,.4); color:#fff2bd; border-radius:10px; padding:7px 11px; cursor:pointer; font-weight:900; }
+.admin-actions { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.admin-action-btn.coins { border-color:#f3c75c; }
+.admin-action-modal { max-width:420px; }
+.admin-action-icon { font-size:48px; margin-bottom:4px; filter:drop-shadow(0 4px 5px #000); }
+.admin-action-player { color:#ffe8a2; font-weight:900; margin-top:-8px; }
+.admin-field-label { display:block; text-align:left; margin:14px 0 6px; color:#ffe8a2; font-weight:900; }
+.admin-action-modal input,.admin-action-modal textarea { width:100%; }
+.admin-action-modal textarea { min-height:130px; resize:vertical; border:2px solid #e4a63a; border-radius:10px; padding:10px; font:inherit; color:#231006; }
+.admin-confirm { margin-top:16px; min-width:220px; }
+.gift-message { font-size:16px; line-height:1.4; }
+@media(max-width:700px){.admin-actions{grid-template-columns:repeat(2,minmax(0,1fr));}.admin-player-head{align-items:flex-start}.admin-player-meta{font-size:9px}.lb-row{grid-template-columns:34px 34px minmax(0,1fr) auto;gap:6px;}}
+@media(max-width:430px){.modal{padding:10px}.modal-box{width:96vw;padding:21px 14px;border-radius:20px}.modal-box h2{font-size:23px}.admin-actions{grid-template-columns:1fr 1fr}.lb-row{padding:8px 5px}.lb-score{font-size:12px}.multi-field{max-width:260px}}

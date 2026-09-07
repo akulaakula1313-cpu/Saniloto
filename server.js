@@ -218,41 +218,48 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, Object.entries(db.users).map(([k, v]) => ({ uid: k, ...v })));
   }
 
-  // Админские действия: бан/разбан, деньги, монеты, VIP и персональное сообщение.
+  // Админские действия: отдельные деньги, монеты, VIP, бан и SMS.
   if (pathname === '/api/admin/action' && req.method === 'POST') {
     const body = await readBody(req);
-    const { adminPassword, action, uid, bills, coins, message } = body;
+    const { adminPassword, action, uid, amount, message } = body;
     if (adminPassword !== (process.env.ADMIN_PASSWORD || 'admin123')) {
       return sendJSON(res, 401, { error: 'Wrong password' });
     }
     const db = loadDB();
     const target = db.users[uid];
     if (!target) return sendJSON(res, 404, { error: 'Игрок не найден' });
+    if (!Array.isArray(target.pendingGifts)) target.pendingGifts = [];
 
-    const numBills = Math.max(0, Math.floor(Number(bills) || 0));
-    const numCoins = Math.max(0, Math.floor(Number(coins) || 0));
+    const num = Math.max(0, Math.floor(Number(amount) || 0));
+    const pushNotice = (type, text, extra = {}) => {
+      target.pendingGifts.push({ type, message: text || '', createdAt: Date.now(), ...extra });
+      if (target.pendingGifts.length > 30) target.pendingGifts = target.pendingGifts.slice(-30);
+    };
 
-    if (action === 'ban') target.isBanned = true;
-    else if (action === 'unban') target.isBanned = false;
-    else if (action === 'vip_on') target.isVip = true;
-    else if (action === 'vip_off') target.isVip = false;
-    else if (action === 'give') {
-      target.bills = Math.max(0, (target.bills || 0) + numBills);
-      target.coins = Math.max(0, (target.coins || 0) + numCoins);
+    if (action === 'ban') {
+      target.isBanned = true;
+      pushNotice('system', 'Ваш аккаунт заблокирован администратором.');
+    } else if (action === 'unban') {
+      target.isBanned = false;
+      pushNotice('system', 'Ваш аккаунт разблокирован. Добро пожаловать обратно!');
+    } else if (action === 'vip_on') {
+      target.isVip = true;
+      pushNotice('vip', 'Администратор SANI GROUP подарил вам VIP-статус! 👑');
+    } else if (action === 'vip_off') {
+      target.isVip = false;
+      pushNotice('vip', 'VIP-статус отключён администратором SANI GROUP.');
+    } else if (action === 'give_bills') {
+      if (!num) return sendJSON(res, 400, { error: 'Укажите количество денег' });
+      target.bills = Math.max(0, (target.bills || 0) + num);
+      pushNotice('bills', `Вам начислено ${num} 💵`, { bills: num, coins: 0 });
+    } else if (action === 'give_coins') {
+      if (!num) return sendJSON(res, 400, { error: 'Укажите количество монет' });
+      target.coins = Math.max(0, (target.coins || 0) + num);
+      pushNotice('coins', `Вам начислено ${num} 🪙`, { bills: 0, coins: num });
     } else if (action === 'message') {
       const text = String(message || '').trim().slice(0, 500);
       if (!text) return sendJSON(res, 400, { error: 'Введите сообщение' });
-      if (!Array.isArray(target.pendingGifts)) target.pendingGifts = [];
-      target.pendingGifts.push({ bills: 0, coins: 0, message: text, createdAt: Date.now() });
-      if (target.pendingGifts.length > 20) target.pendingGifts = target.pendingGifts.slice(-20);
-    } else if (action === 'gift_message') {
-      const text = String(message || '').trim().slice(0, 500);
-      if (!text && !numBills && !numCoins) return sendJSON(res, 400, { error: 'Добавьте подарок или сообщение' });
-      if (!Array.isArray(target.pendingGifts)) target.pendingGifts = [];
-      target.pendingGifts.push({ bills: numBills, coins: numCoins, message: text, createdAt: Date.now() });
-      if (target.pendingGifts.length > 20) target.pendingGifts = target.pendingGifts.slice(-20);
-      target.bills = Math.max(0, (target.bills || 0) + numBills);
-      target.coins = Math.max(0, (target.coins || 0) + numCoins);
+      pushNotice('message', text);
     } else return sendJSON(res, 400, { error: 'Неизвестное действие' });
 
     saveDB(db);

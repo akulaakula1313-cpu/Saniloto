@@ -26,7 +26,29 @@ let currentRoomId = null;
 let multiSyncInterval = null;
 let currentAdminPassword = "";
 let soundOn = true;
+let audioCtx = null;
+let soundUnlocked = false;
 let gameState = null;
+
+function unlockSound() {
+  if (soundUnlocked) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      audioCtx = audioCtx || new AC();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      g.gain.value = 0.0001; o.frequency.value = 440;
+      o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.02);
+    }
+    if (window.speechSynthesis) window.speechSynthesis.resume();
+    soundUnlocked = true;
+  } catch (_) {}
+}
+
+document.addEventListener("pointerdown", unlockSound, { once: false });
+document.addEventListener("keydown", unlockSound, { once: false });
 
 function speakDrumNumber(n) {
   if (!soundOn || !window.speechSynthesis) return;
@@ -39,36 +61,23 @@ function speakDrumNumber(n) {
   window.speechSynthesis.speak(utterance);
 }
 
-function playNotificationSound() {
+function playNotificationSound(kind = 'message') {
   if (!soundOn) return;
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
-    gain1.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start();
-    osc1.stop(ctx.currentTime + 0.15);
-
-    setTimeout(() => {
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(880, ctx.currentTime);
-      gain2.gain.setValueAtTime(0.1, ctx.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start();
-      osc2.stop(ctx.currentTime + 0.2);
-    }, 120);
-  } catch (e) { console.log(e); }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = audioCtx || new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const notes = kind === 'vip' ? [659.25, 987.77, 1318.51] : kind === 'bills' ? [523.25, 659.25] : kind === 'coins' ? [783.99, 987.77] : [587.33, 880];
+    notes.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.12 + 0.18);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(audioCtx.currentTime + i * 0.12); osc.stop(audioCtx.currentTime + i * 0.12 + 0.2);
+    });
+  } catch (_) {}
 }
 
 async function loadUser() {
@@ -293,53 +302,92 @@ async function adminRequest(action, playerUid, extra = {}) {
   return data;
 }
 
+let pendingAdminForm = null;
+
+function openAdminForm(kind, p) {
+  pendingAdminForm = { kind, uid: p.uid, name: p.name };
+  const modal = document.getElementById('modal-admin-action');
+  const icon = document.getElementById('admin-action-icon');
+  const title = document.getElementById('admin-action-title');
+  const player = document.getElementById('admin-action-player');
+  const amountWrap = document.getElementById('admin-action-amount-wrap');
+  const messageWrap = document.getElementById('admin-action-message-wrap');
+  const amount = document.getElementById('admin-action-amount');
+  const message = document.getElementById('admin-action-message');
+  player.textContent = p.name;
+  amount.value = '';
+  message.value = '';
+  amountWrap.classList.toggle('hidden', kind === 'message');
+  messageWrap.classList.toggle('hidden', kind !== 'message');
+  if (kind === 'bills') { icon.textContent='💵'; title.textContent='Подарить деньги'; document.getElementById('admin-action-label').textContent='Сколько денег начислить?'; amount.placeholder='1000'; }
+  if (kind === 'coins') { icon.textContent='🪙'; title.textContent='Подарить монеты'; document.getElementById('admin-action-label').textContent='Сколько монет начислить?'; amount.placeholder='10'; }
+  if (kind === 'message') { icon.textContent='💬'; title.textContent='Отправить SMS'; }
+  modal.classList.remove('hidden');
+}
+
 function playerAdminCard(p) {
   const wrap = document.createElement('div');
   wrap.className = 'admin-player-card';
-  const status = p.isBanned ? '<span class="admin-badge danger">ЗАБЛОКИРОВАН</span>' : '<span class="admin-badge success">ОНЛАЙН</span>';
+  const status = p.isBanned ? '<span class="admin-badge danger">ЗАБЛОКИРОВАН</span>' : '<span class="admin-badge success">АКТИВЕН</span>';
   const vip = p.isVip ? '<span class="admin-badge vip">👑 VIP</span>' : '';
   wrap.innerHTML = `
     <div class="admin-player-head">
       <div class="admin-player-avatar">${AVATARS[p.avatar] || '🙂'}</div>
       <div class="admin-player-info">
         <div class="admin-player-name">${escapeHtml(p.name)} ${vip}</div>
-        <div class="admin-player-meta">${status} <span>ID: ${escapeHtml(p.uid)}</span></div>
+        <div class="admin-player-meta">${status}<span>ID: ${escapeHtml(p.uid)}</span></div>
         <div class="admin-balances"><span>💵 ${p.bills || 0}</span><span>🪙 ${p.coins || 0}</span></div>
       </div>
     </div>
     <div class="admin-actions">
-      <button class="admin-action-btn money" data-act="give">💰 Подарить</button>
+      <button class="admin-action-btn money" data-act="bills">💵 ДЕНЬГИ</button>
+      <button class="admin-action-btn coins" data-act="coins">🪙 МОНЕТЫ</button>
       <button class="admin-action-btn message" data-act="message">💬 SMS</button>
-      <button class="admin-action-btn vip" data-act="vip">👑 VIP</button>
-      <button class="admin-action-btn ${p.isBanned ? 'unban' : 'ban'}" data-act="ban">${p.isBanned ? '🔓 Разблокировать' : '🔒 Заблокировать'}</button>
+      <button class="admin-action-btn vip" data-act="vip">${p.isVip ? '👑 УБРАТЬ VIP' : '👑 ДАТЬ VIP'}</button>
+      <button class="admin-action-btn ${p.isBanned ? 'unban' : 'ban'}" data-act="ban">${p.isBanned ? '🔓 РАЗБЛОКИРОВАТЬ' : '🔒 ЗАБЛОКИРОВАТЬ'}</button>
     </div>`;
 
-  wrap.querySelector('[data-act="give"]').onclick = async () => {
-    const bills = prompt(`Деньги для ${p.name}:`, '1000');
-    if (bills === null) return;
-    const coins = prompt('Монеты:', '10');
-    if (coins === null) return;
-    if (await adminRequest('give', p.uid, { bills, coins })) refreshAdminPanel();
-  };
-  wrap.querySelector('[data-act="message"]').onclick = async () => {
-    const message = prompt(`SMS для ${p.name}:`, 'Привет от SANI GROUP!');
-    if (message === null) return;
-    if (await adminRequest('message', p.uid, { message })) refreshAdminPanel();
-  };
+  wrap.querySelector('[data-act="bills"]').onclick = () => openAdminForm('bills', p);
+  wrap.querySelector('[data-act="coins"]').onclick = () => openAdminForm('coins', p);
+  wrap.querySelector('[data-act="message"]').onclick = () => openAdminForm('message', p);
   wrap.querySelector('[data-act="vip"]').onclick = async () => {
-    const action = p.isVip ? 'vip_off' : 'vip_on';
-    if (await adminRequest(action, p.uid)) refreshAdminPanel();
+    if (await adminRequest(p.isVip ? 'vip_off' : 'vip_on', p.uid)) refreshAdminPanel();
   };
   wrap.querySelector('[data-act="ban"]').onclick = async () => {
-    const action = p.isBanned ? 'unban' : 'ban';
-    if (await adminRequest(action, p.uid)) refreshAdminPanel();
+    if (await adminRequest(p.isBanned ? 'unban' : 'ban', p.uid)) refreshAdminPanel();
   };
   return wrap;
 }
-
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 }
+
+document.getElementById('btn-close-admin-action').addEventListener('click', () => {
+  document.getElementById('modal-admin-action').classList.add('hidden');
+  pendingAdminForm = null;
+});
+
+document.getElementById('btn-admin-action-confirm').addEventListener('click', async () => {
+  if (!pendingAdminForm) return;
+  const { kind, uid: playerUid } = pendingAdminForm;
+  let ok = false;
+  if (kind === 'message') {
+    const message = document.getElementById('admin-action-message').value.trim();
+    if (!message) return alert('Введите сообщение');
+    ok = !!(await adminRequest('message', playerUid, { message }));
+  } else {
+    const amount = document.getElementById('admin-action-amount').value;
+    if (!amount || Number(amount) <= 0) return alert('Введите количество');
+    ok = !!(await adminRequest(kind === 'bills' ? 'give_bills' : 'give_coins', playerUid, { amount }));
+  }
+  if (ok) {
+    document.getElementById('modal-admin-action').classList.add('hidden');
+    pendingAdminForm = null;
+    refreshAdminPanel();
+  }
+});
+
+document.getElementById('admin-refresh').addEventListener('click', refreshAdminPanel);
 
 async function refreshAdminPanel() {
   const res = await fetch('/api/admin/players', {
@@ -359,26 +407,52 @@ async function refreshAdminPanel() {
   players.forEach(p => list.appendChild(playerAdminCard(p)));
 }
 
+let notificationQueue = [];
+let notificationBusy = false;
+
 function showGiftNotifications(gifts) {
-  playNotificationSound();
-  let b = 0; let c = 0; let messages = [];
-  gifts.forEach(g => { b += g.bills || 0; c += g.coins || 0; if (g.message) messages.push(g.message); });
+  notificationQueue = Array.isArray(gifts) ? gifts.slice() : [];
+  notificationBusy = false;
+  showNextNotification();
+}
+
+function showNextNotification() {
+  if (notificationBusy || notificationQueue.length === 0) return;
+  notificationBusy = true;
+  const g = notificationQueue[0] || {};
+  const type = g.type || (g.bills ? 'bills' : g.coins ? 'coins' : 'message');
+  playNotificationSound(type);
   const modal = document.getElementById('modal-gift-alert');
-  document.getElementById('gift-icon').textContent = messages.length ? '💬' : '🎁';
-  document.getElementById('gift-title').textContent = messages.length ? 'Сообщение от SANI GROUP' : 'Вам подарок!';
-  document.getElementById('gift-sender').innerHTML = messages.length ? messages.map(m => `<div class="gift-message">${escapeHtml(m)}</div>`).join('') : 'Получено от: SANI GROUP';
-  document.getElementById('gift-alert-bills').textContent = b > 0 ? `+${b} 💵` : '';
-  document.getElementById('gift-alert-coins').textContent = c > 0 ? `  +${c} 🪙` : '';
+  const icon = document.getElementById('gift-icon');
+  const title = document.getElementById('gift-title');
+  const sender = document.getElementById('gift-sender');
+  const bills = document.getElementById('gift-alert-bills');
+  const coins = document.getElementById('gift-alert-coins');
+  const map = {
+    bills: ['💵','Подарок: деньги','Вам начислены деньги от SANI GROUP'],
+    coins: ['🪙','Подарок: монеты','Вам начислены монеты от SANI GROUP'],
+    vip: ['👑','VIP-уведомление','Новое уведомление от SANI GROUP'],
+    message: ['💬','SMS от SANI GROUP','Личное сообщение'],
+    system: ['🔔','Уведомление','Сообщение от администратора']
+  };
+  const cfg = map[type] || map.message;
+  icon.textContent = cfg[0]; title.textContent = cfg[1]; sender.innerHTML = `<div class="gift-message">${escapeHtml(g.message || cfg[2])}</div>`;
+  bills.textContent = g.bills ? `+${g.bills} 💵` : '';
+  coins.textContent = g.coins ? `+${g.coins} 🪙` : '';
   modal.classList.remove('hidden');
   document.getElementById('btn-close-gift-alert').onclick = async () => {
     modal.classList.add('hidden');
-    await fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid, pendingGifts: [] }) });
-    await loadUser();
+    notificationQueue.shift(); notificationBusy = false;
+    if (notificationQueue.length) { setTimeout(showNextNotification, 180); }
+    else {
+      await fetch('/api/state', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ uid, pendingGifts:[] }) });
+      await loadUser();
+    }
   };
 }
 
 document.getElementById('btn-play').addEventListener('click', () => openModal('setup'));
 document.getElementById('setup-start').addEventListener('click', () => { closeModal('setup'); const selectedMode = document.querySelector('input[name="game-mode"]:checked').value; startGame(selectedMode, 3); });
 document.getElementById('btn-exit-game').addEventListener('click', () => location.reload());
-document.getElementById('btn-sound').addEventListener('click', (e) => { soundOn = !soundOn; e.target.textContent = soundOn ? '🔊' : '🔇'; });
+document.getElementById('btn-sound').addEventListener('click', (e) => { unlockSound(); soundOn = !soundOn; e.target.textContent = soundOn ? '🔊' : '🔇'; });
 loadUser(); setInterval(loadUser, 5000);
