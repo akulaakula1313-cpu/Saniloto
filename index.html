@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Лото Онлайн: Классика от SANI GROUP</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.svg">
 </head>
 <body>
   <div id="app">
@@ -28,6 +29,7 @@
         <button class="btn" data-modal="daily">Ежедневные награды</button>
         <button class="btn" data-modal="leaderboard">Лидерборд</button>
         <button class="btn" data-modal="shop">Магазин</button>
+        <button class="btn vip-menu-btn" data-modal="vipstore">👑 VIP STORE</button>
         <button class="btn" data-modal="marker">Маркер</button>
         <button class="btn" data-modal="profile">Профиль</button>
         <button class="btn" data-modal="rules">Правила</button>
@@ -100,7 +102,7 @@
     <div id="modal-shop" class="modal hidden">
       <div class="modal-box">
         <button class="icon-close-modal" data-close="shop">✖</button>
-        <h2>🛒 Магазин валюты</h2>
+        <h2>🛒 Магазин SANI GROUP</h2><p class="shop-subtitle">Бочонки и карточки • 5 премиум-дизайнов + 1 эксклюзивный VIP-дизайн</p>
         <div class="shop-list" id="shop-list"></div>
       </div>
     </div>
@@ -136,6 +138,7 @@
         <h2>👥 Стол Лото с Друзьями</h2>
         
         <div id="multi-create-block">
+          <label class="vip-room-option"><input type="checkbox" id="multi-vip-room"> 👑 VIP Room — только для VIP</label><br><br>
           <h3>Создать новый стол:</h3>
           <label>Мест за столом (2-6): <input type="number" id="multi-max-players" value="2" min="2" max="6" style="width:50px; color:#000;"></label><br><br>
           <label>Ставка стола (💵): <input type="number" id="multi-stake" value="300" style="width:80px; color:#000;"></label><br><br>
@@ -184,10 +187,16 @@
     </div>
 
     <!-- МОДАЛКА: ПРОФИЛЬ -->
+    <div id="modal-vipstore" class="modal hidden">
+      <div class="modal-box vip-store-box"><button class="icon-close-modal" data-close="vipstore">✖</button><h2>👑 VIP STORE</h2><p>Эксклюзивные предметы доступны только VIP.</p><div id="vip-shop-list" class="shop-list"></div></div>
+    </div>
+
     <div id="modal-profile" class="modal hidden">
       <div class="modal-box">
         <button class="icon-close-modal" data-close="profile">✖</button>
         <h2>👤 Профиль</h2>
+        <div id="profile-vip"></div><div id="profile-stats" class="profile-stats"></div>
+        <button class="btn vip-weekly-btn" id="vip-weekly-claim">👑 Получить VIP-подарок</button>
         <input type="text" id="profile-name-input" style="padding:5px; text-align:center; color:#000;"><br>
         <div id="profile-current-avatar" style="font-size:40px; margin:10px 0;">🧑‍🦲</div>
         <div id="avatar-grid"></div>
@@ -211,6 +220,7 @@
       <div class="modal-box">
         <button class="icon-close-modal" id="btn-close-admin">✖</button>
         <h2>👑 Панель Администратора SANI GROUP</h2>
+        <p class="admin-note">Управление VIP, подарками, деньгами, монетами и блокировками игроков.</p>
         <div id="admin-auth-block">
           <input type="password" id="admin-password-input" placeholder="Пароль" style="padding:5px; text-align:center; color:#000;"><br><br>
           <button class="btn" id="btn-admin-auth">Войти</button>

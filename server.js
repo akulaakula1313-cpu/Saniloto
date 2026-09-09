@@ -19,7 +19,11 @@ const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8'
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml'
 };
 
 function loadDB() {
@@ -32,6 +36,18 @@ function loadDB() {
     const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     if (!db.users || typeof db.users !== 'object') db.users = {};
     if (!Array.isArray(db.leaderboard)) db.leaderboard = [];
+    for (const u of Object.values(db.users)) {
+      if (!Array.isArray(u.unlockedBarrels)) u.unlockedBarrels = [0];
+      if (!Array.isArray(u.unlockedCards)) u.unlockedCards = [0];
+      if (!Number.isInteger(u.barrelDesign)) u.barrelDesign = 0;
+      if (!Number.isInteger(u.cardDesign)) u.cardDesign = 0;
+      if (typeof u.isVip !== 'boolean') u.isVip = false;
+      if (!Number.isFinite(u.wins)) u.wins = 0;
+      if (!Number.isFinite(u.totalWinnings)) u.totalWinnings = 0;
+      if (!Number.isFinite(u.gamesPlayed)) u.gamesPlayed = 0;
+      if (!Number.isFinite(u.lastVipWeeklyGift)) u.lastVipWeeklyGift = 0;
+      if (typeof u.isBanned !== 'boolean') u.isBanned = false;
+    }
     return db;
   } catch {
     return { users: {}, leaderboard: [] };
@@ -57,7 +73,15 @@ function defaultUser(name) {
     createdAt: Date.now(),
     pendingGifts: [],
     isVip: false,
-    isBanned: false
+    wins: 0,
+    totalWinnings: 0,
+    gamesPlayed: 0,
+    lastVipWeeklyGift: 0,
+    isBanned: false,
+    unlockedBarrels: [0],
+    unlockedCards: [0],
+    barrelDesign: 0,
+    cardDesign: 0
   };
 }
 
@@ -153,6 +177,7 @@ function sanitizeRoom(room, uid) {
     stake: room.stake,
     maxPlayers: room.maxPlayers,
     mode: room.mode,
+    vipOnly: !!room.vipOnly,
     status: room.status,
     drawn: room.drawn,
     bank: room.bank,
@@ -193,6 +218,7 @@ function payoutWinner(room, db, uid) {
   if (!winner) return 0;
   const amount = room.bank;
   winner.bills += amount;
+  winner.wins = (winner.wins||0) + 1; winner.totalWinnings = (winner.totalWinnings||0) + amount;
   room.bank = 0;
   room.paidOut = true;
   room.status = 'finished';
@@ -279,6 +305,15 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true, user });
     }
 
+    if (pathname === '/api/game/stat' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      if (!user) return sendJSON(res,404,{error:'Пользователь не найден'});
+      if (body.action === 'start') user.gamesPlayed=(user.gamesPlayed||0)+1;
+      else if (body.action === 'win') { user.wins=(user.wins||0)+1; }
+      else return sendJSON(res,400,{error:'Неизвестная статистика'});
+      saveDB(db); return sendJSON(res,200,{ok:true,user});
+    }
+
     if (pathname === '/api/dailyreward/claim' && req.method === 'POST') {
       const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
       if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
@@ -288,19 +323,43 @@ const server = http.createServer(async (req, res) => {
       const day = Number(user.dailyStreak || 0) % rewards.length;
       const reward = rewards[day];
       user.bills += reward.bills || 0; user.coins += reward.coins || 0;
+      if (user.isVip) { user.coins += 500; user.pendingGifts.push({ type: 'vip_daily', bills: 0, coins: 500, message: 'VIP-бонус за вход 👑', at: now }); }
       user.dailyStreak = Number(user.dailyStreak || 0) + 1; user.lastClaim = now;
       saveDB(db);
       return sendJSON(res, 200, { ok: true, reward, user });
     }
 
-    if (pathname === '/api/shop/buy' && req.method === 'POST') {
+    if (pathname === '/api/vip/weekly/claim' && req.method === 'POST') {
       const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
-      const bills = Number.parseInt(body.bills, 10); const coins = Number.parseInt(body.coins, 10);
-      if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
-      if (!Number.isInteger(bills) || !Number.isInteger(coins) || bills <= 0 || coins <= 0 || bills > 1000000 || coins > 100000) return sendJSON(res, 400, { error: 'Некорректный товар' });
-      if (user.bills < bills) return sendJSON(res, 400, { error: 'Недостаточно денег' });
-      user.bills -= bills; user.coins += coins; saveDB(db);
-      return sendJSON(res, 200, { ok: true, user });
+      if (!user) return sendJSON(res, 404, { error: 'Пользователь не найден' });
+      if (!user.isVip) return sendJSON(res, 403, { error: 'Только для VIP' });
+      const now = Date.now(); const week = 7 * 24 * 60 * 60 * 1000;
+      if (now - Number(user.lastVipWeeklyGift || 0) < week) return sendJSON(res, 400, { error: 'VIP-подарок доступен раз в 7 дней' });
+      user.bills += 5000; user.coins += 1000; user.lastVipWeeklyGift = now;
+      const pool = ['barrel:1','barrel:2','barrel:3','barrel:4','barrel:5','card:1','card:2','card:3','card:4','card:5'];
+      const gift = pool[crypto.randomInt(pool.length)]; const [type,idText] = gift.split(':'); const id = Number(idText);
+      const key = type === 'barrel' ? 'unlockedBarrels' : 'unlockedCards'; if (!user[key].includes(id)) user[key].push(id);
+      user.pendingGifts.push({ type:'vip_weekly', bills:5000, coins:1000, cosmetic:{type,id}, message:'Еженедельный VIP-подарок 👑', at:now });
+      saveDB(db); return sendJSON(res,200,{ok:true,reward:{bills:5000,coins:1000,cosmetic:{type,id}},user});
+    }
+
+    if (pathname === '/api/cosmetic/buy' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      if (!user) return sendJSON(res, 404, { error: 'Игрок не найден' }); if (user.isBanned) return sendJSON(res, 403, { error: 'Игрок заблокирован' });
+      const type = String(body.type||''); const id = Number.parseInt(body.id,10);
+      const catalog = type==='barrel' ? {1:2500,2:3500,3:5000,4:6500,5:8000} : type==='card' ? {1:2500,2:3500,3:5000,4:6500,5:8000} : null;
+      const vipId = 6; if (!catalog || !Number.isInteger(id) || id<1 || id>6) return sendJSON(res,400,{error:'Неизвестный дизайн'});
+      if (id===vipId) { if (!user.isVip) return sendJSON(res,403,{error:'Дизайн доступен только VIP'}); }
+      else { const cost=catalog[id]; if (user.coins<cost) return sendJSON(res,400,{error:'Недостаточно 🪙 монет'}); user.coins-=cost; }
+      const key=type==='barrel'?'unlockedBarrels':'unlockedCards'; if(!user[key].includes(id))user[key].push(id); if(type==='barrel')user.barrelDesign=id;else user.cardDesign=id;
+      saveDB(db); return sendJSON(res,200,{ok:true,user:{uid:body.uid,...user}});
+    }
+    if (pathname === '/api/cosmetic/equip' && req.method === 'POST') {
+      const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid);
+      if (!user) return sendJSON(res,404,{error:'Игрок не найден'}); if(user.isBanned)return sendJSON(res,403,{error:'Игрок заблокирован'});
+      const type=String(body.type||''); const id=Number.parseInt(body.id,10); const key=type==='barrel'?'unlockedBarrels':type==='card'?'unlockedCards':null;
+      if(!key||!Number.isInteger(id)||!user[key].includes(id))return sendJSON(res,403,{error:'Дизайн не куплен'});
+      if(id===4&&!user.isVip)return sendJSON(res,403,{error:'VIP-дизайн недоступен'}); if(type==='barrel')user.barrelDesign=id;else user.cardDesign=id; saveDB(db); return sendJSON(res,200,{ok:true,user:{uid:body.uid,...user}});
     }
 
     if (pathname === '/api/marker/buy' && req.method === 'POST') {
@@ -322,7 +381,7 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/leaderboard' && req.method === 'GET') {
       const db = loadDB();
-      const list = Object.entries(db.users).map(([uid, u]) => ({ uid, name: u.name, avatar: u.avatar, isVip: !!u.isVip, score: Number(u.bills || 0) }));
+      const list = Object.entries(db.users).map(([uid, u]) => ({ uid, name: u.name, avatar: u.avatar, isVip: !!u.isVip, score: Number(u.bills || 0), wins:Number(u.wins||0) }));
       list.sort((a, b) => b.score - a.score);
       return sendJSON(res, 200, list.slice(0, 50));
     }
@@ -332,14 +391,16 @@ const server = http.createServer(async (req, res) => {
       const maxPlayers = Math.max(2, Math.min(6, Number.parseInt(body.maxPlayers, 10) || 2));
       const stake = Number.parseInt(body.stake, 10);
       const mode = ['A', 'B', 'C'].includes(body.mode) ? body.mode : 'A';
+      const vipOnly = body.vipOnly === true;
       if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
+      if (vipOnly && !user.isVip) return sendJSON(res, 403, { error: 'VIP-комната доступна только VIP-игрокам 👑' });
       if (!Number.isInteger(stake) || stake < 1 || stake > 1000000) return sendJSON(res, 400, { error: 'Некорректная ставка' });
       if (user.bills < stake) return sendJSON(res, 400, { error: 'Недостаточно денег для ставки!' });
       if (Object.values(rooms).some(r => r.players.some(p => p.uid === body.uid) && ['waiting', 'playing'].includes(r.status))) return sendJSON(res, 400, { error: 'Вы уже за другим столом' });
       let roomId; do roomId = String(crypto.randomInt(1000, 10000)); while (rooms[roomId]);
       user.bills -= stake;
       const player = { uid: body.uid, name: user.name, avatar: user.avatar, ticket: generateTicket(), contribution: stake, stakePaid: true, refunded: false, active: true, lastSeen: Date.now() };
-      rooms[roomId] = { id: roomId, stake, maxPlayers, mode, players: [player], status: 'waiting', deck: shuffle(Array.from({ length: 90 }, (_, i) => i + 1)), drawn: [], bank: stake, lastTick: Date.now(), chat: [], createdAt: Date.now(), paidOut: false };
+      rooms[roomId] = { id: roomId, stake, maxPlayers, mode, vipOnly, players: [player], status: 'waiting', deck: shuffle(Array.from({ length: 90 }, (_, i) => i + 1)), drawn: [], bank: stake, lastTick: Date.now(), chat: [], createdAt: Date.now(), paidOut: false };
       saveDB(db);
       return sendJSON(res, 200, { ok: true, roomId, room: sanitizeRoom(rooms[roomId], body.uid), userBalance: user.bills });
     }
@@ -349,13 +410,14 @@ const server = http.createServer(async (req, res) => {
       if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
       if (!room) return sendJSON(res, 404, { error: 'Стол не найден!' });
       if (room.status !== 'waiting') return sendJSON(res, 400, { error: 'Игра уже началась!' });
+      if (room.vipOnly && !user.isVip) return sendJSON(res, 403, { error: 'VIP-комната доступна только VIP-игрокам 👑' });
       if (room.players.some(p => p.uid === body.uid && p.active)) return sendJSON(res, 200, { ok: true, room: sanitizeRoom(room, body.uid), userBalance: user.bills });
       if (room.players.filter(p => p.active).length >= room.maxPlayers) return sendJSON(res, 400, { error: 'Стол заполнен!' });
       if (user.bills < room.stake) return sendJSON(res, 400, { error: 'Недостаточно денег!' });
       user.bills -= room.stake;
       room.bank += room.stake;
       room.players.push({ uid: body.uid, name: user.name, avatar: user.avatar, ticket: generateTicket(), contribution: room.stake, stakePaid: true, refunded: false, active: true, lastSeen: Date.now() });
-      if (room.players.filter(p => p.active).length >= room.maxPlayers) { room.status = 'playing'; room.lastTick = Date.now(); }
+      if (room.players.filter(p => p.active).length >= room.maxPlayers) { room.status = 'playing'; room.lastTick = Date.now(); for (const p of room.players.filter(x=>x.active)) { const u=db.users[p.uid]; if(u) u.gamesPlayed=(u.gamesPlayed||0)+1; } }
       saveDB(db);
       return sendJSON(res, 200, { ok: true, room: sanitizeRoom(room, body.uid), userBalance: user.bills });
     }
@@ -412,7 +474,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req); const db = loadDB(); const room = rooms[String(body.roomId || '')]; const user = requireUser(db, body.uid);
       if (!room || !user || !room.players.some(p => p.uid === body.uid && p.active)) return sendJSON(res, 400, { error: 'Комната или пользователь не найдены' });
       const text = cleanText(body.text, 300); if (!text) return sendJSON(res, 400, { error: 'Пустое сообщение' });
-      room.chat.push({ uid: body.uid, name: user.name, text, at: Date.now() }); if (room.chat.length > 20) room.chat.shift();
+      room.chat.push({ uid: body.uid, name: user.name, isVip:!!user.isVip, text, at: Date.now() }); if (room.chat.length > 20) room.chat.shift();
       touchPlayer(room, body.uid); return sendJSON(res, 200, { ok: true });
     }
 
@@ -420,7 +482,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/chat/global/send' && req.method === 'POST') {
       const body = await readBody(req); const db = loadDB(); const user = requireUser(db, body.uid); if (!user) return sendJSON(res, 400, { error: 'Пользователь не найден' });
       const text = cleanText(body.text, 300); if (!text) return sendJSON(res, 400, { error: 'Пустое сообщение' });
-      globalChat.push({ uid: body.uid, name: user.name, text, at: Date.now() }); if (globalChat.length > 30) globalChat.shift(); return sendJSON(res, 200, { ok: true });
+      globalChat.push({ uid: body.uid, name: user.name, isVip:!!user.isVip, text, at: Date.now() }); if (globalChat.length > 30) globalChat.shift(); return sendJSON(res, 200, { ok: true });
     }
 
     if (pathname === '/api/admin/players' && req.method === 'POST') {
@@ -446,7 +508,7 @@ const server = http.createServer(async (req, res) => {
       if (user.pendingGifts.length > 50) user.pendingGifts = user.pendingGifts.slice(-50); saveDB(db); return sendJSON(res, 200, { ok: true, user: { uid: body.uid, ...user } });
     }
 
-    const fileMap = { '/': 'index.html', '/index.html': 'index.html', '/style.css': 'style.css', '/client.js': 'client.js' };
+    const fileMap = { '/': 'index.html', '/index.html': 'index.html', '/style.css': 'style.css', '/client.js': 'client.js', '/sani-loto-banner.png': 'sani-loto-banner.png', '/favicon.svg': 'favicon.svg' };
     if (fileMap[pathname]) {
       const filePath = path.join(PUBLIC_DIR, fileMap[pathname]);
       if (fs.existsSync(filePath)) { res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain; charset=utf-8' }); return res.end(fs.readFileSync(filePath)); }

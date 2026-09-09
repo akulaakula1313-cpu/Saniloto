@@ -1,7 +1,11 @@
 {
   "name": "loto-online-sani-group",
-  "version": "8.0.0",
+  "version": "9.0.0",
   "private": true,
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" }
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }
