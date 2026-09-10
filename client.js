@@ -57,11 +57,18 @@ async function renderLeaderboard(){const list=document.getElementById('leaderboa
 function renderShop(){
  const list=document.getElementById('shop-list'); if(!list)return; list.innerHTML='';
  user.unlockedBarrels=user.unlockedBarrels||[0]; user.unlockedCards=user.unlockedCards||[0];
- const title=document.createElement('div'); title.className='shop-section-title'; title.innerHTML='<b>🎱 Дизайны бочонка</b><small>Выберите внешний вид бочонка</small>'; list.appendChild(title);
- BARREL_DESIGNS.forEach(item=>renderCosmetic(item,'barrel',list));
- const titleVip=document.createElement('div'); titleVip.className='shop-section-title vip-store-title'; titleVip.innerHTML='<b>👑 VIP STORE</b><small>Эксклюзивные предметы только для VIP</small>'; list.appendChild(titleVip); BARREL_DESIGNS.filter(x=>x.vip).forEach(item=>renderCosmetic(item,'barrel',list)); CARD_DESIGNS.filter(x=>x.vip).forEach(item=>renderCosmetic(item,'card',list));
- const title2=document.createElement('div'); title2.className='shop-section-title'; title2.innerHTML='<b>🎟️ Дизайны карточки</b><small>Выберите внешний вид карточки</small>'; list.appendChild(title2);
- CARD_DESIGNS.forEach(item=>renderCosmetic(item,'card',list));
+ const head=document.createElement('div'); head.className='shop-hero'; head.innerHTML='<div class="shop-hero-icon">🛍️</div><div><h3>Премиум коллекция</h3><p>Персонализируйте бочонок и игровую карточку.</p></div>'; list.appendChild(head);
+ const tabs=document.createElement('div'); tabs.className='shop-tabs';
+ const barrelTab=document.createElement('button'); barrelTab.className='shop-tab active'; barrelTab.textContent='🎱 Бочонки';
+ const cardTab=document.createElement('button'); cardTab.className='shop-tab'; cardTab.textContent='🎟️ Карточки';
+ tabs.append(barrelTab,cardTab); list.appendChild(tabs);
+ const content=document.createElement('div'); content.className='shop-tab-content'; list.appendChild(content);
+ const vipNote=document.createElement('div'); vipNote.className='vip-store-link-note'; vipNote.innerHTML='<span>👑</span><div><b>VIP STORE</b><small>Эксклюзивные предметы доступны только VIP. Откройте отдельный VIP STORE.</small></div><button class="btn shop-vip-open">Открыть</button>'; list.appendChild(vipNote);
+ function fill(type){content.innerHTML='';const arr=type==='barrel'?BARREL_DESIGNS:CARD_DESIGNS;const title=document.createElement('div');title.className='shop-section-title';title.innerHTML=`<div><b>${type==='barrel'?'🎱 Дизайны бочонка':'🎟️ Дизайны карточки'}</b><small>${type==='barrel'?'Выберите стиль выпавшего номера':'Выберите стиль игровой карточки'}</small></div><span>${arr.filter(x=>!x.vip).length} дизайнов</span>`;content.appendChild(title);const grid=document.createElement('div');grid.className='shop-grid';arr.filter(x=>!x.vip).forEach(item=>renderCosmetic(item,type,grid));content.appendChild(grid);}
+ barrelTab.onclick=()=>{barrelTab.classList.add('active');cardTab.classList.remove('active');fill('barrel');};
+ cardTab.onclick=()=>{cardTab.classList.add('active');barrelTab.classList.remove('active');fill('card');};
+ vipNote.querySelector('.shop-vip-open').onclick=()=>openModal('vipstore');
+ fill('barrel');
 }
 function renderCosmetic(item,type,list){
  const owned=(type==='barrel'?user.unlockedBarrels:user.unlockedCards).includes(item.id);
